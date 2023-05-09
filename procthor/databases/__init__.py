@@ -57,11 +57,11 @@ def _get_asset_database() -> dict:
     )
 
 
-def _get_skyboxes() -> list:
+def _get_skyboxes() -> Dict[str, Dict[str, str]]:
     return _load_json_from_database("skyboxes.json")
 
 
-def _get_asset_id_database() -> dict:
+def _get_asset_id_database() -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     asset_type_database = _get_asset_database()
     asset_id_database = dict()
     for assets in asset_type_database.values():
@@ -110,7 +110,7 @@ def _get_asset_groups() -> Dict[str, Any]:
     return out
 
 
-def _get_object_in_receptacles() -> Dict[str, List[str]]:
+def _get_object_in_receptacles() -> Dict[str, Dict[str, Dict[str, Union[float, int]]]]:
     return _load_json_from_database("receptacles.json")
 
 
