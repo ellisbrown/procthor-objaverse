@@ -1,12 +1,14 @@
+import os
+
 import compress_json
 
 from ai2thor.controller import Controller
 from ai2thor.hooks.procedural_asset_hook import ProceduralAssetHookRunner
-from procthor.constants import PROCESSED_ASSET_DIRECTORY, PROCTHOR_INITIALIZATION
+from procthor.constants import PROCESSED_ASSET_DIRECTORY, PROCTHOR_INITIALIZATION, ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR
 
 if __name__ == "__main__":
     house = compress_json.load(
-        "procthor/objaverse/house_generation/datasets/procthor-objaverse/train/12.json.gz"
+        os.path.join(ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR, "datasets/procthor-objaverse/train/0.json.gz")
     )
 
     c = Controller(

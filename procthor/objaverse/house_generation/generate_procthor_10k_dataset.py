@@ -1,12 +1,10 @@
 import logging
+import multiprocessing as mp
 import os
-import platform
 import queue
 import sys
 import time
 import traceback
-from datetime import datetime
-from time import sleep
 from typing import Sequence, List
 
 import numpy as np
@@ -14,19 +12,16 @@ import torch
 
 from ai2thor.controller import Controller
 from ai2thor.platform import CloudRendering
-from procthor.constants import PROCTHOR_INITIALIZATION
+from procthor.constants import PROCTHOR_INITIALIZATION, ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR
 from procthor.generation import HouseGenerator
 from procthor.objaverse.house_generation.room_spec_sampler import (
     ROOM_SPECS,
     UniformRoomSpecSampler,
 )
-import multiprocessing as mp
-
 from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from scripts.example import _create_objaverse_generation_functions
 
 mp = mp.get_context("spawn" if sys.platform == "darwin" else "forkserver")
-# mp = mp.get_context("forkserver")
 
 
 def partition_sequence(seq: Sequence, parts: int) -> List:
@@ -70,7 +65,7 @@ def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
         generation_functions=_create_objaverse_generation_functions(),
     )
 
-    save_dir = f"datasets/procthor-objaverse/{split}"
+    save_dir = os.path.join(ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR, f"datasets/procthor-objaverse/{split}")
     os.makedirs(save_dir, exist_ok=True)
 
     houses_generated = 0

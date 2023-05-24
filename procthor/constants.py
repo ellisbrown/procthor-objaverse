@@ -2,6 +2,8 @@ import os
 
 from ai2thor.hooks.procedural_asset_hook import ProceduralAssetHookRunner
 
+ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+
 USE_ITHOR_SPLITS = True
 """Determines if the iTHOR object splits should be used spawning objects."""
 
