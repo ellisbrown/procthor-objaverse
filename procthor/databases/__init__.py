@@ -2,7 +2,7 @@ import json
 import os
 from collections import defaultdict
 from functools import lru_cache
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Union, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,6 @@ class ProcTHORDatabase:
     ASSET_DATABASE: Dict[str, List[Dict[str, Any]]]
     ASSET_ID_DATABASE: Dict[str, Any]
     PLACEMENT_ANNOTATIONS: pd.DataFrame
-    AI2THOR_OBJECT_METADATA: Dict[str, List[List[Dict[str, Any]]]]
     ASSET_GROUPS: Dict[str, Any]
     ASSETS_DF: pd.DataFrame
     WALL_HOLES: Dict[str, Dict[str, Dict[str, float]]]
@@ -34,115 +33,14 @@ class ProcTHORDatabase:
     """These objects should be placed first inside of the rooms."""
 
 
-def _load_json_from_database(json_file: str) -> Union[list, dict]:
-    dirname = os.path.dirname(__file__)
-    filepath = os.path.join(dirname, json_file)
-    with open(filepath, "r") as f:
-        return json.load(f)
-
-
-def _get_solid_wall_colors() -> List[Dict[str, float]]:
-    return _load_json_from_database("solid-wall-colors.json")
-
-
-def _get_material_database() -> dict:
-    return _load_json_from_database("material-database.json")
-
-
-def _get_asset_database() -> dict:
-    return (
-        _load_json_from_database("procthor-ithor-split-asset-database.json")
-        if USE_ITHOR_SPLITS
-        else _load_json_from_database("asset-database.json")
-    )
-
-
-def _get_skyboxes() -> Dict[str, Dict[str, str]]:
-    return _load_json_from_database("skyboxes.json")
-
-
-def _get_asset_id_database() -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
-    asset_type_database = _get_asset_database()
-    asset_id_database = dict()
-    for assets in asset_type_database.values():
-        for asset in assets:
-            asset_id_database[asset["assetId"]] = asset
-    return asset_id_database
-
-
-def _get_ai2thor_object_metadata() -> dict:
-    return _load_json_from_database("ai2thor-object-metadata.json")
-
-
-def _get_placement_annotations(fillna: bool = True) -> pd.DataFrame:
-    dirname = os.path.dirname(__file__)
-    filepath = os.path.join(dirname, "placement-annotations.json")
-
-    df = pd.read_json(filepath)
-    if fillna:
-        for key in ["inKitchens", "inLivingRooms", "inBedrooms", "inBathrooms"]:
-            df[key] = df[key].fillna(0).astype(np.uint8)
-        for key in [
-            "inCorner",
-            "inMiddle",
-            "onEdge",
-            "onFloor",
-            "onWall",
-            "isPickupable",
-            "isKinematic",
-            "isStructure",
-            "multiplePerRoom",
-        ]:
-            df[key] = df[key].fillna(0).astype(bool)
-    df.index.names = ["assetType"]
-    return df
-
-
-def _get_asset_groups() -> Dict[str, Any]:
-    """Maps each asset group to the web metadata of the asset group."""
-    out = dict()
-    dirname = os.path.join(os.path.dirname(__file__), "asset_groups")
-    for fname in os.listdir(dirname):
-        if not fname.endswith(".json"):
-            continue
-        with open(f"{dirname}/{fname}", "r") as f:
-            out[fname[: -len(".json")]] = json.load(f)
-    return out
-
-
-def _get_object_in_receptacles() -> Dict[str, Dict[str, Dict[str, Union[float, int]]]]:
-    return _load_json_from_database("receptacles.json")
-
-
-def _get_assets_df() -> pd.DataFrame:
-    asset_id_db = _get_asset_id_database()
-    return pd.DataFrame(
-        [
-            {
-                "split": asset["split"],
-                "assetId": asset["assetId"],
-                "objectType": asset["objectType"],
-                "xSize": asset["boundingBox"]["x"],
-                "ySize": asset["boundingBox"]["y"],
-                "zSize": asset["boundingBox"]["z"],
-            }
-            for asset in asset_id_db.values()
-        ]
-    )
-
-
-def _get_wall_holes() -> Dict[str, Any]:
-    return _load_json_from_database("wall-holes.json")
-
-
 @lru_cache(maxsize=None)
 def get_spawnable_asset_group_info(
     split: Split, controller: Controller, pt_db: ProcTHORDatabase
 ) -> pd.DataFrame:
     from procthor.generation.asset_groups import AssetGroupGenerator
 
-    asset_groups = _get_asset_groups()
-    asset_database = _get_asset_database()
+    asset_groups = pt_db.ASSET_GROUPS
+    asset_database = pt_db.ASSET_DATABASE
 
     data = []
     for asset_group_name, asset_group_data in asset_groups.items():
@@ -192,6 +90,118 @@ def get_spawnable_asset_group_info(
     return pd.DataFrame(data)
 
 
+class DatabaseLoader:
+    def __init__(self, databases_dir: Optional[str] = None):
+        self.databases_dir = databases_dir
+
+    def _load_json_from_database(self, json_file: str) -> Union[list, dict]:
+        filepath = os.path.join(self.databases_dir, json_file)
+        with open(filepath, "r") as f:
+            return json.load(f)
+
+    def get_solid_wall_colors(
+        self,
+    ) -> List[Dict[str, float]]:
+        return self._load_json_from_database("solid-wall-colors.json")
+
+    def get_material_database(
+        self,
+    ) -> dict:
+        return self._load_json_from_database("material-database.json")
+
+    def get_asset_database(
+        self,
+    ) -> dict:
+        return (
+            self._load_json_from_database("procthor-ithor-split-asset-database.json")
+            if USE_ITHOR_SPLITS
+            else self._load_json_from_database("asset-database.json")
+        )
+
+    def get_skyboxes(
+        self,
+    ) -> Dict[str, Dict[str, str]]:
+        return self._load_json_from_database("skyboxes.json")
+
+    def get_asset_id_database(
+        self,
+    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        asset_type_database = self.get_asset_database()
+        asset_id_database = dict()
+        for assets in asset_type_database.values():
+            for asset in assets:
+                asset_id_database[asset["assetId"]] = asset
+        return asset_id_database
+
+    def get_ai2thor_object_metadata(
+        self,
+    ) -> dict:
+        return self._load_json_from_database("ai2thor-object-metadata.json")
+
+    def get_placement_annotations(self, fillna: bool = True) -> pd.DataFrame:
+        filepath = os.path.join(self.databases_dir, "placement-annotations.json")
+
+        df = pd.read_json(filepath)
+        if fillna:
+            for key in ["inKitchens", "inLivingRooms", "inBedrooms", "inBathrooms"]:
+                df[key] = df[key].fillna(0).astype(np.uint8)
+            for key in [
+                "inCorner",
+                "inMiddle",
+                "onEdge",
+                "onFloor",
+                "onWall",
+                "isPickupable",
+                "isKinematic",
+                "isStructure",
+                "multiplePerRoom",
+            ]:
+                df[key] = df[key].fillna(0).astype(bool)
+        df.index.names = ["assetType"]
+        return df
+
+    def get_asset_groups(
+        self,
+    ) -> Dict[str, Any]:
+        """Maps each asset group to the web metadata of the asset group."""
+        out = dict()
+        dirname = os.path.join(self.databases_dir, "asset_groups")
+        for fname in os.listdir(dirname):
+            if not fname.endswith(".json"):
+                continue
+            with open(f"{dirname}/{fname}", "r") as f:
+                out[fname[: -len(".json")]] = json.load(f)
+        return out
+
+    def get_object_in_receptacles(
+        self,
+    ) -> Dict[str, Dict[str, Dict[str, Union[float, int]]]]:
+        return self._load_json_from_database("receptacles.json")
+
+    def get_assets_df(
+        self,
+    ) -> pd.DataFrame:
+        asset_id_db = self.get_asset_id_database()
+        return pd.DataFrame(
+            [
+                {
+                    "split": asset["split"],
+                    "assetId": asset["assetId"],
+                    "objectType": asset["objectType"],
+                    "xSize": asset["boundingBox"]["x"],
+                    "ySize": asset["boundingBox"]["y"],
+                    "zSize": asset["boundingBox"]["z"],
+                }
+                for asset in asset_id_db.values()
+            ]
+        )
+
+    def get_wall_holes(
+        self,
+    ) -> Dict[str, Any]:
+        return self._load_json_from_database("wall-holes.json")
+
+
 def _get_floor_assets(
     room_type: str, split: str, pt_db: ProcTHORDatabase
 ) -> Tuple[Any, pd.DataFrame]:
@@ -232,18 +242,19 @@ class keydefaultdict(defaultdict):
             return ret
 
 
+_DDL = DatabaseLoader(databases_dir=os.path.dirname(__file__))
+
 DEFAULT_PROCTHOR_DATABASE = ProcTHORDatabase(
-    SOLID_WALL_COLORS=_get_solid_wall_colors(),
-    MATERIAL_DATABASE=_get_material_database(),
-    SKYBOXES=_get_skyboxes(),
-    OBJECTS_IN_RECEPTACLES=_get_object_in_receptacles(),
-    ASSET_DATABASE=_get_asset_database(),
-    ASSET_ID_DATABASE=_get_asset_id_database(),
-    PLACEMENT_ANNOTATIONS=_get_placement_annotations(),
-    AI2THOR_OBJECT_METADATA=_get_ai2thor_object_metadata(),
-    ASSET_GROUPS=_get_asset_groups(),
-    ASSETS_DF=_get_assets_df(),
-    WALL_HOLES=_get_wall_holes(),
+    SOLID_WALL_COLORS=_DDL.get_solid_wall_colors(),
+    MATERIAL_DATABASE=_DDL.get_material_database(),
+    SKYBOXES=_DDL.get_skyboxes(),
+    OBJECTS_IN_RECEPTACLES=_DDL.get_object_in_receptacles(),
+    ASSET_DATABASE=_DDL.get_asset_database(),
+    ASSET_ID_DATABASE=_DDL.get_asset_id_database(),
+    PLACEMENT_ANNOTATIONS=_DDL.get_placement_annotations(),
+    ASSET_GROUPS=_DDL.get_asset_groups(),
+    ASSETS_DF=_DDL.get_assets_df(),
+    WALL_HOLES=_DDL.get_wall_holes(),
     FLOOR_ASSET_DICT=keydefaultdict(_get_default_floor_assets_from_key),
     PRIORITY_ASSET_TYPES={
         "Bedroom": ["Bed", "Dresser"],

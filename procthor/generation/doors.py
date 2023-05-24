@@ -4,15 +4,17 @@ import logging
 import random
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
+import networkx as nx
 import pandas as pd
-from ai2thor.controller import Controller
 from attr import field
 from attrs import define
 from shapely.geometry import Polygon
 
+from ai2thor.controller import Controller
 from procthor.constants import OUTDOOR_ROOM_ID
+from procthor.generation.house import PartialHouse
 from procthor.utils.types import (
     BoundaryGroups,
     BoundingBox,
@@ -23,13 +25,8 @@ from procthor.utils.types import (
     Vector3,
     Wall,
 )
-
-from ..databases import ProcTHORDatabase
-
-if TYPE_CHECKING:
-    from . import PartialHouse
-
 from .room_specs import RoomSpec
+from ..databases import ProcTHORDatabase
 
 OPEN_ROOM_CONNECTIONS = [
     {"between": {"Kitchen", "LivingRoom"}, "p": 0.75, "pFrame": 0.5}
@@ -93,7 +90,6 @@ def default_add_doors(
     openings = select_openings(
         neighboring_rooms=set(boundary_groups.keys()),
         room_spec_neighbors=room_spec_neighbors,
-        room_spec=room_spec,
     )
     door_walls = select_door_walls(
         openings=openings,
@@ -134,9 +130,12 @@ def select_outdoor_openings(
     doors_to_outside = []
 
     # NOTE: Check preferred room types
+    # add a breakpoint
     for room_id_1, room_id_2 in outdoor_candidates:
         room_id = room_id_1 if room_id_2 == OUTDOOR_ROOM_ID else room_id_2
-        room_type = room_type_map[room_id]
+        room_type = room_type_map.get(room_id)
+        if room_type is None:
+            continue
         if room_type in PREFERRED_ROOMS_TO_OUTSIDE:
             doors_to_outside.append((room_id_1, room_id_2))
         if n_doors_target == len(doors_to_outside):
@@ -242,8 +241,7 @@ def randomly_prioritize_room_ids(
 
 def select_openings(
     neighboring_rooms: Set[Tuple[int, int]],
-    room_spec_neighbors: List[Dict[int, Any]],
-    room_spec: RoomSpec,
+    room_spec_neighbors: List[List[Set[int]]],
 ) -> List[Tuple[int, int]]:
     """Select which neighboring rooms should have doors between them.
 
@@ -263,31 +261,54 @@ def select_openings(
         if len(group_neighbors) == 1:
             continue
 
-        # NOTE: indexes that still need connecting rooms
-        need_connections_between = list(range(len(group_neighbors)))
-        while need_connections_between:
-            next_room_i = random.choice(need_connections_between)
-            other_room_is = [i for i in range(len(group_neighbors)) if i != next_room_i]
-            random.shuffle(other_room_is)
-            n1_subgroup = group_neighbors[next_room_i]
-            for other_room_i in other_room_is:
-                n2_subgroup = group_neighbors[other_room_i]
-                combos = [
-                    (a, b) if a < b else (b, a)
-                    for a in n1_subgroup
-                    for b in n2_subgroup
-                ]
-                combos = randomly_prioritize_room_ids(
-                    room_id_pairs=combos, room_spec=room_spec
+        g = nx.Graph()
+        try:
+            group_ind_pair_to_room_pairs_that_connect = {}
+            for (room_group_0_ind, room_group_0), (
+                room_group_1_ind,
+                room_group_1,
+            ) in itertools.combinations(enumerate(group_neighbors), 2):
+                group_ind_pair = (room_group_0_ind, room_group_1_ind)
+                for room0, room1 in itertools.product(room_group_0, room_group_1):
+                    if room0 > room1:
+                        tmp = room0
+                        room0 = room1
+                        room1 = tmp
+
+                    room_pair = (room0, room1)
+                    if room_pair in neighboring_rooms:
+                        if group_ind_pair not in g:
+                            g.add_edge(*group_ind_pair, weight=random.random())
+                            group_ind_pair_to_room_pairs_that_connect[
+                                group_ind_pair
+                            ] = []
+                        group_ind_pair_to_room_pairs_that_connect[
+                            group_ind_pair
+                        ].append(room_pair)
+
+            assert nx.is_connected(g)
+
+            for (room_group_0_ind, room_group_1_ind, _) in list(
+                nx.minimum_spanning_edges(g)
+            ):
+                group_ind_pair = (room_group_0_ind, room_group_1_ind)
+                if room_group_0_ind > room_group_1_ind:
+                    group_ind_pair = (room_group_1_ind, room_group_0_ind)
+                selected_doors.append(
+                    random.choice(
+                        group_ind_pair_to_room_pairs_that_connect[group_ind_pair]
+                    )
                 )
-                for door_combo in combos:
-                    if door_combo in neighboring_rooms:
-                        selected_doors.append(door_combo)
-                        if next_room_i in need_connections_between:
-                            need_connections_between.remove(next_room_i)
-                        if other_room_i in need_connections_between:
-                            need_connections_between.remove(other_room_i)
-                        break
+        except Exception as e:
+            print(
+                "Failed for: {} - {} - {} - {}".format(
+                    group_neighbors,
+                    room_spec_neighbors,
+                    g,
+                    group_ind_pair_to_room_pairs_that_connect.keys(),
+                )
+            )
+            raise e
 
     return selected_doors
 

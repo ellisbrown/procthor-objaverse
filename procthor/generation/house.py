@@ -11,8 +11,6 @@ import numpy as np
 from ai2thor.controller import Controller
 from attrs import define
 from moviepy.editor import ImageSequenceClip
-from shapely.geometry import Point
-
 from procthor.constants import FLOOR_Y, PROCTHOR_INITIALIZATION, SCHEMA
 from procthor.generation.agent import AgentPose, generate_starting_pose
 from procthor.utils.types import (
@@ -26,6 +24,7 @@ from procthor.utils.types import (
     Wall,
     Window,
 )
+from shapely.geometry import Point
 
 from .objects import ProceduralRoom
 from .room_specs import RoomSpec

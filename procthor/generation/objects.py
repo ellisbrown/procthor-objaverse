@@ -85,6 +85,61 @@ def sample_openness(obj_type: str) -> float:
     return openness
 
 
+def get_shared_edge_rects(shared_edge_rects, rect1):
+    x0_0, z0_0, x1_0, z1_0 = rect1
+    points1 = {(x0_0, z0_0), (x0_0, z1_0), (x1_0, z1_0), (x1_0, z0_0)}
+    out = set()
+    for rect in shared_edge_rects.copy():
+        x0_1, z0_1, x1_1, z1_1 = rect
+        points2 = {(x0_1, z0_1), (x0_1, z1_1), (x1_1, z1_1), (x1_1, z0_1)}
+
+        if len(points1 & points2) == 2:
+            out.add(
+                (
+                    min(x0_0, x1_0, x0_1, x1_1),
+                    min(z0_0, z1_0, z0_1, z1_1),
+                    max(x0_0, x1_0, x0_1, x1_1),
+                    max(z0_0, z1_0, z0_1, z1_1),
+                )
+            )
+    return out
+
+
+def get_edge_map_output(edge_map, edge):
+    x_0, y_0, x_1, y_1 = edge
+    out = edge_map[(x_0, y_0, x_1, y_1)] + edge_map[(x_1, y_1, x_0, y_0)]
+    return set(out)
+
+
+def _join_neighboring_rectangles_optimized(
+    rects: Set[Tuple[float, float, float, float]]
+) -> Tuple[float, float, float, float]:
+    orig_rects = rects.copy()
+    out = set()
+
+    edge_map = defaultdict(list)
+    for i, rect in enumerate(rects.copy()):
+        x0_0, z0_0, x1_0, z1_0 = rect
+
+        shared_edge_rects = get_edge_map_output(edge_map, (x0_0, z0_0, x0_0, z1_0))
+        out = out.union(get_shared_edge_rects(shared_edge_rects, rect))
+
+        shared_edge_rects = get_edge_map_output(edge_map, (x0_0, z1_0, x1_0, z1_0))
+        out = out.union(get_shared_edge_rects(shared_edge_rects, rect))
+
+        shared_edge_rects = get_edge_map_output(edge_map, (x1_0, z1_0, x1_0, z0_0))
+        out = out.union(get_shared_edge_rects(shared_edge_rects, rect))
+
+        shared_edge_rects = get_edge_map_output(edge_map, (x1_0, z0_0, x0_0, z0_0))
+        out = out.union(get_shared_edge_rects(shared_edge_rects, rect))
+
+        edge_map[(x0_0, z0_0, x0_0, z1_0)].append(rect)
+        edge_map[(x0_0, z1_0, x1_0, z1_0)].append(rect)
+        edge_map[(x1_0, z1_0, x1_0, z0_0)].append(rect)
+        edge_map[(x1_0, z0_0, x0_0, z0_0)].append(rect)
+    return out - orig_rects
+
+
 @define
 class Asset:
     asset_id: str
@@ -130,11 +185,13 @@ class Asset:
 
     @property
     def asset_dict(self) -> Object:
+        object_type = self.pt_db.ASSET_ID_DATABASE[self.asset_id]["objectType"]
         return Object(
-            id=f"{self.room_id}|{self.object_n}",
+            id=f"{object_type}|{self.room_id}|{self.object_n}",
             position=self.position,
             rotation=Vector3(x=0, y=self.rotation, z=0),
             assetId=self.asset_id,
+            objectType=object_type,
             kinematic=bool(
                 self.pt_db.PLACEMENT_ANNOTATIONS.loc[
                     self.pt_db.ASSET_ID_DATABASE[self.asset_id]["objectType"]
@@ -205,10 +262,11 @@ class AssetGroup:
 
         objects = {
             obj["instanceId"]: Object(
-                id=f"{self.room_id}|{self.object_n}|{i}",
+                id=f"{self.asset_group_name}|{self.room_id}|{self.object_n}|{i}",
                 position=obj["position"],
                 rotation=Vector3(x=0, y=obj["rotation"], z=0),
                 assetId=obj["assetId"],
+                objectType=self.pt_db.ASSET_ID_DATABASE[obj["assetId"]]["objectType"],
                 kinematic=bool(
                     self.pt_db.PLACEMENT_ANNOTATIONS.loc[
                         self.pt_db.ASSET_ID_DATABASE[obj["assetId"]]["objectType"]
@@ -315,7 +373,7 @@ class OrthogonalPolygon:
         neighboring_rectangles = self.get_neighboring_rectangles().copy()
         curr_rects = neighboring_rectangles
         while True:
-            rect_candidates = self._join_neighboring_rectangles(curr_rects)
+            rect_candidates = _join_neighboring_rectangles_optimized(curr_rects)
             rects = curr_rects | rect_candidates
             if len(rects) == len(curr_rects):
                 return curr_rects

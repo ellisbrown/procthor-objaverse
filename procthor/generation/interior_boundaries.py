@@ -4,8 +4,10 @@ import random
 from typing import Optional, Tuple
 
 import numpy as np
+from scipy.ndimage.measurements import label
 
 from procthor.constants import OUTDOOR_ROOM_ID
+from procthor.utils.types import InvalidFloorplan
 
 DEFAULT_AVERAGE_ROOM_SIZE = 3
 """Average room size in meters"""
@@ -15,6 +17,35 @@ DEFAULT_MIN_HOUSE_SIDE_LENGTH = 2
 
 DEFAULT_MAX_BOUNDARY_CUT_AREA = 6
 """Max area of a single chop along the boundary."""
+
+
+def count_components(boundary):
+    boundary = boundary != OUTDOOR_ROOM_ID
+    structure = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+    labeled_boundary, num_components = label(boundary, structure)
+    return num_components
+
+
+def is_valid_cut(boundary, chop_side, z_cut, x_cut):
+    if chop_side == 0:
+        # NOTE: top-right corner
+        boundary[:z_cut, -x_cut:] = OUTDOOR_ROOM_ID
+    elif chop_side == 1:
+        # NOTE: top-left corner
+        boundary[:z_cut, :x_cut] = OUTDOOR_ROOM_ID
+    elif chop_side == 2:
+        # NOTE: bottom-left corner
+        boundary[-z_cut:, :x_cut] = OUTDOOR_ROOM_ID
+    elif chop_side == 3:
+        # NOTE: bottom-right corner
+        boundary[-z_cut:, -x_cut:] = OUTDOOR_ROOM_ID
+
+    num_components = count_components(boundary=boundary)
+    return num_components == 1, boundary
+
+
+def is_valid_interior_boundary(boundary):
+    return count_components(boundary=boundary) == 1
 
 
 def get_n_cuts(num_rooms: int) -> int:
@@ -71,18 +102,28 @@ def sample_interior_boundary(
             i += 1
 
         z_cut = random.choice(z_cut_candidates)
+        is_valid, new_boundary = is_valid_cut(
+            np.copy(boundary), chop_side, z_cut, x_cut
+        )
 
-        if chop_side == 0:
-            # NOTE: top-right corner
-            boundary[:z_cut, -x_cut:] = OUTDOOR_ROOM_ID
-        elif chop_side == 1:
-            # NOTE: top-left corner
-            boundary[:z_cut, :x_cut] = OUTDOOR_ROOM_ID
-        elif chop_side == 2:
-            # NOTE: bottom-left corner
-            boundary[-z_cut:, :x_cut] = OUTDOOR_ROOM_ID
-        elif chop_side == 3:
-            # NOTE: bottom-right corner
-            boundary[-z_cut:, -x_cut:] = OUTDOOR_ROOM_ID
+        if is_valid:
+            if chop_side == 0:
+                # NOTE: top-right corner
+                boundary[:z_cut, -x_cut:] = OUTDOOR_ROOM_ID
+            elif chop_side == 1:
+                # NOTE: top-left corner
+                boundary[:z_cut, :x_cut] = OUTDOOR_ROOM_ID
+            elif chop_side == 2:
+                # NOTE: bottom-left corner
+                boundary[-z_cut:, :x_cut] = OUTDOOR_ROOM_ID
+            elif chop_side == 3:
+                # NOTE: bottom-right corner
+                boundary[-z_cut:, -x_cut:] = OUTDOOR_ROOM_ID
+        # else:
+        #     print("Found invalid boundary cut: {}".format(new_boundary))
 
+    if not is_valid_interior_boundary(boundary):
+        raise InvalidFloorplan(
+            "Not all rooms in the interior boundary matrix can be connected!"
+        )
     return boundary

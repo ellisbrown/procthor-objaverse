@@ -3,7 +3,6 @@ Add small objects to the house.
 
 Also randomizes the openness of some of the objects.
 """
-
 import copy
 import logging
 import random
@@ -12,12 +11,12 @@ from typing import Dict, List
 
 import numpy as np
 from ai2thor.controller import Controller
-
 from procthor.constants import FLOOR_Y, OPENNESS_RANDOMIZATIONS
 from procthor.utils.types import Object, Split, Vector3
+
+from ..databases import ProcTHORDatabase
 from . import PartialHouse
 from .objects import ProceduralRoom, sample_openness
-from ..databases import ProcTHORDatabase
 
 PARENT_BIAS = defaultdict(
     lambda: 0.2, {"Chair": 0, "ArmChair": 0, "Countertop": 0.2, "ShelvingUnit": 0.4}
@@ -201,7 +200,7 @@ def default_add_small_objects(
 
                 chosen_asset_id = asset_candidates.sample()["assetId"].iloc[0]
 
-                generated_object_id = f"small|{room_id}|{num_placed_object_instances}"
+                generated_object_id = f"{group['childObjectType']}|{room_id}|{num_placed_object_instances}"
 
                 # NOTE: spawn below the floor so it doesn't tip over any other objects.
                 event = controller.step(
@@ -277,6 +276,7 @@ def default_add_small_objects(
                         Object(
                             id=generated_object_id,
                             assetId=chosen_asset_id,
+                            objectType=group["childObjectType"],
                             rotation=obj["rotation"],
                             position=center_position,
                             kinematic=bool(

@@ -82,8 +82,12 @@ class Window(TypedDict):
 
 class Object(TypedDict):
     id: str
+
     assetId: str
     """The id of the asset in the asset database."""
+
+    objectType: str
+    """The type of the asset in the asset database."""
 
     rotation: Vector3
     """The global rotation of the object."""

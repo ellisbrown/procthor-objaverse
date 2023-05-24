@@ -1,4 +1,8 @@
-USE_ITHOR_SPLITS = False
+import os
+
+from ai2thor.hooks.procedural_asset_hook import ProceduralAssetHookRunner
+
+USE_ITHOR_SPLITS = True
 """Determines if the iTHOR object splits should be used spawning objects."""
 
 OPENNESS_RANDOMIZATIONS = {
@@ -62,7 +66,19 @@ probability of choosing the largest remaining one.
 MIN_RECTANGLE_SIDE_SIZE = 0.5
 """The minimum rectangle size per side, in meters, that can be chosen."""
 
-PROCTHOR_INITIALIZATION = dict(branch="cam_adjust", scene="Procedural")
+PROCESSED_ASSET_DIRECTORY = os.environ.get(
+    "OBJAVERSE_DIR", os.path.join(os.path.dirname(__file__), "objaverse", "objaverse_assets")
+)
+
+PROCTHOR_INITIALIZATION = dict(
+    # local_executable_path="/Users/lucaw/Dropbox/ai2/late2020-ai2thor/unity/builds/thor-OSXIntel64-local/thor-OSXIntel64-local.app/Contents/MacOS/AI2-THOR",
+    commit_id="b73676f46bfdbacecc626f5535fda221326773f9",
+    # branch="cam_adjust",
+    scene="Procedural",
+    action_hook_runner=ProceduralAssetHookRunner(
+        asset_directory=PROCESSED_ASSET_DIRECTORY, asset_symlink=True, verbose=True
+    ),
+)
 "Base AI2-THOR initialization parameters for ProcTHOR."
 
 FLOOR_Y = 0
