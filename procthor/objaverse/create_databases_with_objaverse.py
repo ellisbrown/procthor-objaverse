@@ -1,20 +1,21 @@
 import copy
+import hashlib
 import json
+import math
 import os
+import random
 import re
-import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Any
 
 import compress_json
-import compress_pickle
 import pandas as pd
 import prior
 import tqdm
+from procthor.databases import DEFAULT_PROCTHOR_DATABASE, ProcTHORDatabase
 
 from procthor.constants import USE_ITHOR_SPLITS, PROCESSED_ASSET_DIRECTORY
-from procthor.databases import DEFAULT_PROCTHOR_DATABASE, ProcTHORDatabase
 
 OBJAVERSE_DIR = os.path.abspath(os.path.dirname(Path(__file__)))
 OBJAVERSE_DATASETS_DIR = os.path.join(OBJAVERSE_DIR, "objaverse_databases")
@@ -63,7 +64,7 @@ def create_asset_database(
                 "objectType": object_type,
                 "scenes": [],  # TODO: Don't think we need this
                 "secondaryProperties": [],
-                "split": "train",  # TODO
+                "split": asset["split"],
                 "states": {},  # TODO: This seems to only apply to objects that open
                 "isObjaverse": True,
                 "refObjectType": asset["ref_category"],
@@ -345,6 +346,40 @@ def filter_annotations(
     return filtered
 
 
+def create_hash_seed(s: str) -> int:
+    h = hashlib.md5()
+    h.update(s.encode())
+    return int(h.hexdigest(), 16) % 2 ** 31
+
+
+def create_splits(
+    annotations: Dict[str, Dict[str, Any]],
+):
+    cat_to_objects = defaultdict(list)
+
+    for oid, info in annotations.items():
+        cat_to_objects[info["category"]].append(info)
+
+    for cat, objects in tqdm.tqdm(cat_to_objects.items(), "Creating splits"):
+        objects.sort(key=lambda x: x["uid"])
+        random.Random(create_hash_seed(cat)).shuffle(objects)
+
+        ntest = max(math.floor(len(objects) * 0.1), 1)
+        ntrain = min(round(len(objects) * 0.8), max(len(objects) - ntest, 0))
+        nvalid = len(objects) - ntest - ntrain
+
+        for obj in objects[:ntrain]:
+            obj["split"] = "train"
+
+        for obj in objects[ntrain:ntrain+nvalid]:
+            obj["split"] = "val"
+
+        for obj in objects[ntrain+nvalid:]:
+            obj["split"] = "test"
+
+    return annotations
+
+
 def main():
     # with open(
     #     os.path.join(OBJAVERSE_DIR, "annotations/objaverse_thor_v0p95_success.json"),
@@ -358,6 +393,8 @@ def main():
 
     new_db = copy.deepcopy(DEFAULT_PROCTHOR_DATABASE)
 
+    annotations = create_splits(annotations)
+
     annotations = refine_annotations_and_update_thor_metadata(
         pt_db=new_db,
         annotations=annotations,
@@ -365,17 +402,27 @@ def main():
         overwrite=False,
     )
 
+    annotations = filter_annotations(annotations)
+
     compress_json.dump(
         annotations, os.path.join(OBJAVERSE_DATASETS_DIR, "refined_annotations.json")
     )
 
-    annotations = filter_annotations(annotations)
-
     # import matplotlib.pyplot as plt
     # import numpy as np
-    # import pandas as pd
-    #
-    # df = pd.DataFrame(annotations.values())
+    import pandas as pd
+
+    df = pd.DataFrame(annotations.values())
+    df["is_train"] = df["split"] == "train"
+    df["is_val"] = df["split"] == "val"
+    df["is_test"] = df["split"] == "test"
+
+    print(f"Contains {len(df)} objects, {len(df[df['is_train']])} train, {len(df[df['is_val']])} val, {len(df[df['is_test']])} test")
+    summed = df.groupby("category")
+    print(f"{(summed['is_train'].sum() > 0).sum()} train categories")
+    print(f"{(summed['is_val'].sum() > 0).sum()} val categories")
+    print(f"{(summed['is_test'].sum() > 0).sum()} test categories")
+
     # df["volume"] = [
     #     np.product(list(a["boundingBox"].values())) for a in annotations.values()
     # ]

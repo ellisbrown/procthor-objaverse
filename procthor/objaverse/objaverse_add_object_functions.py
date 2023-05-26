@@ -1,41 +1,29 @@
 import copy
 import logging
+import pdb
 import random
+import sys
+import warnings
 from collections import defaultdict, Counter
-from statistics import mean
 from typing import (
-    TYPE_CHECKING,
     Any,
     Dict,
     List,
-    Literal,
     Optional,
-    Sequence,
     Set,
-    Tuple,
-    TypedDict,
-    Union,
     Callable,
 )
 
 import numpy as np
 import pandas as pd
+from procthor.databases import ProcTHORDatabase, get_spawnable_asset_group_info
+from shapely.geometry import MultiLineString
+
 from ai2thor.controller import Controller
-from attr import field
-from attrs import define
 from procthor.constants import (
-    MARGIN,
-    MAX_INTERSECTING_OBJECT_RETRIES,
-    MIN_RECTANGLE_SIDE_SIZE,
     OPENNESS_RANDOMIZATIONS,
-    P_CHOOSE_ASSET_GROUP,
-    P_CHOOSE_EDGE,
-    P_LARGEST_RECTANGLE,
-    P_W1_ASSET_SKIPPED,
-    PADDING_AGAINST_WALL,
     FLOOR_Y,
 )
-from procthor.databases import ProcTHORDatabase, get_spawnable_asset_group_info
 from procthor.generation import PartialHouse
 from procthor.generation.objects import (
     P_ALLOW_HOUSE_PLANT_GROUP,
@@ -58,7 +46,6 @@ from procthor.generation.wall_objects import (
     add_windows,
     add_televisions,
     add_paintings,
-    get_assets_df,
     filter_room_lines_df,
     get_wall_placement_info,
     sample_asset_y_position,
@@ -68,13 +55,10 @@ from procthor.objaverse.objaverse_constants import (
     MAX_HEAD_OBJAVERSE_OBJECT_TYPES_PER_ROOM,
     MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM,
     EXCLUDE_NON_OBJAVERSE_ASSETS,
-    OBJAVERSE_WALL_OBJECTS_PER_ROOM, ALLOW_DUPLICATE_OBJAVERSE_WALL_OBJECTS_IN_HOUSE,
+    OBJAVERSE_WALL_OBJECTS_PER_ROOM,
+    ALLOW_DUPLICATE_OBJAVERSE_WALL_OBJECTS_IN_HOUSE,
 )
 from procthor.utils.types import Object, Split, Vector3, BoundaryGroups, Wall
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, MultiLineString
-
-import sys
-import pdb
 
 
 class ForkedPdb(pdb.Pdb):
@@ -115,11 +99,37 @@ def objaverse_add_floor_objects(
         allow_house_plant_group = random.random() < p_allow_house_plant_group
         allow_tv_group = random.random() < p_allow_tv_group
 
-        floor_types, spawnable_assets = pt_db.FLOOR_ASSET_DICT[
-            (room.room_type, room.split)
-        ]
         priority_asset_types = copy.deepcopy(pt_db.PRIORITY_ASSET_TYPES[room.room_type])
         random.shuffle(priority_asset_types)
+
+        split_choices = ["train"]
+        if room.split == "train":
+            pass
+        elif room.split == "val":
+            split_choices.append("val")
+        elif room.split == "test":
+            split_choices.extend(["val", "test"])
+        else:
+            raise NotImplementedError(f"Unknown split {room.split}")
+
+        random.shuffle(split_choices)
+
+        spawnable_assets_df_list = []
+        for split in split_choices:
+            _, spawnable_assets = pt_db.FLOOR_ASSET_DICT[
+                (room.room_type, split)
+            ]
+
+            if EXCLUDE_NON_OBJAVERSE_ASSETS:
+                spawnable_assets = spawnable_assets[
+                    [
+                        at.startswith("Obja") or at in priority_asset_types
+                        for at in spawnable_assets["assetType"]
+                    ]
+                ]
+            spawnable_assets_df_list.append(spawnable_assets)
+        assert any(sa_df.shape[0] > 0 for sa_df in spawnable_assets_df_list)
+        spawnable_assets_df_list = [sa_df for sa_df in spawnable_assets_df_list if sa_df.shape[0] > 0]
 
         spawnable_asset_group_info = get_spawnable_asset_group_info(
             split=room.split, controller=controller, pt_db=pt_db
@@ -145,20 +155,6 @@ def objaverse_add_floor_objects(
                 rectangle
             )
 
-            if EXCLUDE_NON_OBJAVERSE_ASSETS:
-                # ForkedPdb().set_trace()
-                # filtered_spawnable_assets = []
-                # for sa in spawnable_assets:
-                #     print("Spawnable asset is", sa)
-                #     if sa["objectType"] in priority_asset_types or sa["objectType"].startswith("Obja"):
-                #         filtered_spawnable_assets.append(sa)
-                spawnable_assets = spawnable_assets[
-                    [
-                        at.startswith("Obja") or at in priority_asset_types
-                        for at in spawnable_assets["assetType"]
-                    ]
-                ]
-
             asset = sample_and_add_floor_asset(
                 room=room,
                 rectangle=rectangle,
@@ -166,7 +162,7 @@ def objaverse_add_floor_objects(
                 anchor_delta=anchor_delta,
                 allow_house_plant_group=allow_house_plant_group,
                 allow_tv_group=allow_tv_group,
-                spawnable_assets=spawnable_assets,
+                spawnable_assets=random.choice(spawnable_assets_df_list),
                 spawnable_asset_groups=spawnable_asset_groups,
                 priority_asset_types=priority_asset_types,
                 pt_db=pt_db,
@@ -212,8 +208,8 @@ def objaverse_add_floor_objects(
                     ]
 
                     # NOTE: Remove all standalone assets that have the type
-                    spawnable_assets = spawnable_assets[
-                        spawnable_assets["assetType"] != asset_type
+                    spawnable_assets_df_list = [
+                        sd_df[sd_df["assetType"] != asset_type] for sd_df in spawnable_assets_df_list
                     ]
 
         # NOTE: add the formatted assets
@@ -229,6 +225,9 @@ def get_objaverse_assets_df(
     split: str,
     asset_filter: Optional[Callable[[Dict[str, Any]], bool]],
 ) -> pd.DataFrame:
+    split_list = [split]
+    if split == "train":
+        split_list.append(None)
 
     return pd.DataFrame(
         [
@@ -237,11 +236,12 @@ def get_objaverse_assets_df(
                 "xSize": asset["boundingBox"]["x"],
                 "ySize": asset["boundingBox"]["y"],
                 "zSize": asset["boundingBox"]["z"],
+                "split": asset["split"] if asset["split"] is not None else "train",
                 "objectType": asset["objectType"],
             }
             for assets in pt_db.ASSET_DATABASE.values()
             for asset in assets
-            if asset["split"] == split
+            if (split == "all" or asset["split"] in split_list)
             and asset["objectType"].startswith("Obja")
             and (asset_filter is None or asset_filter(asset))
         ]
@@ -260,9 +260,21 @@ def add_objaverse_wall_objects(
     pt_db: ProcTHORDatabase,
 ) -> None:
     """Add paintings to the house."""
-    objaverse_df = get_objaverse_assets_df(
+    split_choices = ["train"]
+    if split == "train":
+        pass
+    elif split == "val":
+        split_choices.append("val")
+    elif split == "test":
+        split_choices.extend(["val", "test"])
+    else:
+        raise NotImplementedError(f"Unknown split {split}")
+
+    random.shuffle(split_choices)
+
+    joint_objaverse_df = get_objaverse_assets_df(
         pt_db=pt_db,
-        split=split,
+        split="all",
         asset_filter=lambda asset: asset["refObjectType"] == "Painting",
     )
 
@@ -270,7 +282,7 @@ def add_objaverse_wall_objects(
         k=len(rooms_lines_df_map), **OBJAVERSE_WALL_OBJECTS_PER_ROOM
     )
 
-    min_obja_size = objaverse_df["xSize"].min()
+    min_obja_size = joint_objaverse_df["xSize"].min()
     for max_in_room, (room_id, room_lines_df) in zip(
         max_objaverse_wall_objects_in_rooms, rooms_lines_df_map.items()
     ):
@@ -280,7 +292,7 @@ def add_objaverse_wall_objects(
             )
 
             # NOTE: No more space on the walls
-            if (not len(room_lines_df)) or (not len(objaverse_df)):
+            if (not len(room_lines_df)) or (not len(joint_objaverse_df)):
                 break
 
             # NOTE: sample the line string
@@ -291,10 +303,15 @@ def add_objaverse_wall_objects(
             )[0]
             room_line = room_lines_df.loc[room_line_i]
 
-            # NOTE: sample the painting
-            obja_candidates = objaverse_df[
-                objaverse_df["xSize"] < room_line["length"]
-            ]
+            # NOTE: sample the objaverse object
+            random.shuffle(split_choices)
+            obja_candidates = None
+            for split_choice in split_choices:
+                sub_df = joint_objaverse_df[joint_objaverse_df["split"] == split_choice]
+                obja_candidates = sub_df[sub_df["xSize"] < room_line["length"]]
+                if obja_candidates.shape[0] > 1:
+                    break
+
             object_to_add = obja_candidates.sample()
 
             # NOTE: Choose the position of the painting
@@ -374,8 +391,8 @@ def add_objaverse_wall_objects(
 
             # NOTE: Don't allow the same painting to be spawned in.
             if not ALLOW_DUPLICATE_OBJAVERSE_WALL_OBJECTS_IN_HOUSE:
-                objaverse_df = objaverse_df.drop(object_to_add.index)
-                min_obja_size = objaverse_df["xSize"].min()
+                joint_objaverse_df = joint_objaverse_df.drop(object_to_add.index)
+                min_obja_size = joint_objaverse_df["xSize"].min()
 
 
 def objaverse_add_wall_objects(
@@ -554,59 +571,73 @@ def objaverse_add_small_objects(
             ].tolist()
         )
 
-        spawnable_objects = []
+        object_type_to_is_head = {}
+        object_type_to_receptacle_infos = defaultdict(list)
         for receptacle in receptacles_in_room:
             objects_in_receptacle = pt_db.OBJECTS_IN_RECEPTACLES[
                 receptacle["objectType"]
             ]
 
-            for object_type, data in objects_in_receptacle.items():
-
-                if EXCLUDE_NON_OBJAVERSE_ASSETS and not object_type.startswith("Obja"):
+            for object_type_to_spawn, data in objects_in_receptacle.items():
+                if (
+                    EXCLUDE_NON_OBJAVERSE_ASSETS
+                    and not object_type_to_spawn.startswith("Obja")
+                ):
                     continue
 
-                type_placement_info = pt_db.PLACEMENT_ANNOTATIONS.loc[object_type]
-                room_weight = pt_db.PLACEMENT_ANNOTATIONS.loc[object_type][
+                type_placement_info = pt_db.PLACEMENT_ANNOTATIONS.loc[
+                    object_type_to_spawn
+                ]
+                room_weight = pt_db.PLACEMENT_ANNOTATIONS.loc[object_type_to_spawn][
                     f"in{room_type}s"
                 ]
+                object_type_to_is_head[object_type_to_spawn] = (
+                    type_placement_info["instances"]
+                    >= MIN_OBJAVERSE_INSTANCES_FOR_HEAD_CATEGORY
+                )
+
                 if room_weight == 0:
                     continue
 
-                spawnable_objects.append(
-                    {
-                        "receptacleId": receptacle["objectId"],
-                        "receptacleType": receptacle["objectType"],
-                        "childObjectType": object_type,
-                        "childRoomWeight": room_weight,
-                        "pSpawn": data["p"],
-                        "isObjaverse": object_type in objaverse_object_types,
-                        "isHead": type_placement_info["instances"]
-                        >= MIN_OBJAVERSE_INSTANCES_FOR_HEAD_CATEGORY,
-                    }
-                )
+                if random.random() <= (
+                    data["p"]
+                    + PARENT_BIAS[receptacle["objectType"]]
+                    + CHILD_BIAS[object_type_to_spawn]
+                    + house_bias
+                ):
+                    if data["p"] == 0:
+                        multiplicity = 1
+                    elif data["p"] == 1:
+                        multiplicity = MAX_OF_TYPE_ON_RECEPTACLE
+                    else:
+                        multiplicity = min(
+                            np.random.geometric(p=1 - data["p"], size=1)[0],
+                            MAX_OF_TYPE_ON_RECEPTACLE,
+                        )
 
-        filtered_spawnable_groups = [
-            group
-            for group in spawnable_objects
-            if random.random()
-            <= (
-                group["pSpawn"]
-                + PARENT_BIAS[group["receptacleType"]]
-                + CHILD_BIAS[group["childObjectType"]]
-                + house_bias
-            )
-        ]
-        random.shuffle(filtered_spawnable_groups)
+                    object_type_to_receptacle_infos[object_type_to_spawn].append(
+                        {
+                            "receptacleId": receptacle["objectId"],
+                            "receptacleType": receptacle["objectType"],
+                            "multiplicity": multiplicity,
+                        }
+                    )
+
         objects_types_placed_in_room = set()
 
         total_head_objaverse_objects_placed = 0
         total_tail_objaverse_objects_placed = 0
-        for group in filtered_spawnable_groups:
+        have_placed_multi_objaverse_head_cat = False
+        while len(object_type_to_receptacle_infos) != 0:
             if len(objects_types_placed_in_room) >= max_object_types_per_room:
                 break
 
-            is_objaverse = group["isObjaverse"]
-            is_head = group["isHead"]
+            object_type_to_spawn = random.choice(
+                list(object_type_to_receptacle_infos.keys())
+            )
+
+            is_objaverse = object_type_to_spawn in objaverse_object_types
+            is_head = object_type_to_is_head[object_type_to_spawn]
 
             # Only spawn a certain number of objaverse objects per room, this number
             # differs for head and tail objects.
@@ -622,46 +653,97 @@ def objaverse_add_small_objects(
                     >= MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM
                 )
             ):
+                del object_type_to_receptacle_infos[object_type_to_spawn]
                 continue
 
-            child_object_type = group["childObjectType"]
-            placement_annotations_for_child = pt_db.PLACEMENT_ANNOTATIONS.loc[
-                child_object_type
+            multiple_per_room = pt_db.PLACEMENT_ANNOTATIONS.loc[object_type_to_spawn][
+                "multiplePerRoom"
             ]
-            multiple_allowed = placement_annotations_for_child["multiplePerRoom"]
 
-            if (not multiple_allowed) and object_type_to_count_in_room.get(
-                child_object_type, 0
-            ) > 0:
-                continue
-
-            # NOTE: Supports things like 3 plates on a surface.
-            num_to_add = 1
-
-            # NOTE: intentionally has no bias on > 1 samples.
-            while (
-                multiple_allowed
-                and num_to_add < MAX_OF_TYPE_ON_RECEPTACLE
-                and random.random() <= group["pSpawn"]
+            if (
+                multiple_per_room
+                and is_objaverse
+                and is_head
+                and not have_placed_multi_objaverse_head_cat
             ):
-                num_to_add += 1
+                # Here we try to place a head category object category multiple times if we haven't already
+                multiplicity = max(
+                    ri["multiplicity"]
+                    for ri in object_type_to_receptacle_infos[object_type_to_spawn]
+                )
+                if multiplicity == 1:
+                    multiplicity = min(
+                        2, len(object_type_to_receptacle_infos[object_type_to_spawn])
+                    )
+            else:
+                multiplicity = random.choice(
+                    object_type_to_receptacle_infos[object_type_to_spawn]
+                )["multiplicity"]
 
-            for _ in range(num_to_add):
-                asset_candidates = pt_db.ASSETS_DF[
-                    (pt_db.ASSETS_DF["objectType"] == group["childObjectType"])
-                    & pt_db.ASSETS_DF["split"].isin(
-                        [split, None]
-                    )  # TODO: This can be optimized
-                ]
+            assert multiplicity > 0, "Multiplicity must be greater than 0!"
 
-                if child_object_type == "HousePlant":
-                    # NOTE: House plants are a weird exception where there are massive
-                    # house plants meant to be placed on the floor, and smaller
-                    # house plants that can be placed on receptacles. This filters
-                    # to only place smaller house plants on receptacles.
-                    asset_candidates = asset_candidates[
-                        asset_candidates["ySize"] < HOUSE_PLANT_MAX_HEIGHT
-                    ]
+            for _ in range(multiplicity):
+                if (
+                    object_type_to_count_in_room.get(object_type_to_spawn, 0) > 0
+                    and not multiple_per_room
+                ):
+                    del object_type_to_receptacle_infos[object_type_to_spawn]
+                    break
+
+                # Here we intentionally randomly sample the spawn receptacle despite using the
+                # multiplicity value from potentially a different spawn receptacle info. This is
+                # to encourage spawning the object in different receptacles.
+                receptacle_info = random.choice(
+                    object_type_to_receptacle_infos[object_type_to_spawn]
+                )
+
+                receptacle_info["multiplicity"] -= 1
+                if receptacle_info["multiplicity"] <= 0:
+                    object_type_to_receptacle_infos[object_type_to_spawn].remove(
+                        receptacle_info
+                    )
+                    if len(object_type_to_receptacle_infos[object_type_to_spawn]) == 0:
+                        del object_type_to_receptacle_infos[object_type_to_spawn]
+
+
+                split_sets = [["train", None]]
+                if split == "train":
+                    pass
+                elif split == "val":
+                    split_sets.append(["val"])
+                elif split == "test":
+                    split_sets.extend([["val"], ["test"]])
+                else:
+                    raise NotImplementedError(f"Unknown split {split}")
+
+                random.shuffle(split_sets)
+
+                asset_candidates = None
+                for split_set in split_sets:
+                    asset_candidates = pt_db.ASSETS_DF[
+                        (pt_db.ASSETS_DF["objectType"] == object_type_to_spawn)
+                        & pt_db.ASSETS_DF["split"].isin(split_set)
+                    ]  # TODO: This can be optimized
+
+                    if object_type_to_spawn == "HousePlant":
+                        # NOTE: House plants are a weird exception where there are massive
+                        # house plants meant to be placed on the floor, and smaller
+                        # house plants that can be placed on receptacles. This filters
+                        # to only place smaller house plants on receptacles.
+                        asset_candidates = asset_candidates[
+                            asset_candidates["ySize"] < HOUSE_PLANT_MAX_HEIGHT
+                            ]
+
+                    if asset_candidates.shape[0] > 0:
+                        break
+
+                if asset_candidates.shape[0] == 0:
+                    # NOTE: This can happen if we have a split that doesn't have any
+                    # assets of this type, e.g. if we only have train assets for this type
+                    # and we're trying to place a val or test object.
+                    if object_type_to_spawn in object_type_to_receptacle_infos:
+                        del object_type_to_receptacle_infos[object_type_to_spawn]
+                    break
 
                 # NOTE: Some objects have multiple sim object receptacles within it,
                 # so we need to specify all of them as possible receptacle object ids.
@@ -669,14 +751,14 @@ def objaverse_add_small_objects(
                 receptacle_object_ids = [
                     obj["objectId"]
                     for obj in event.metadata["objects"]
-                    if obj["objectId"].startswith(group["receptacleId"])
+                    if obj["objectId"].startswith(receptacle_info["receptacleId"])
                 ]
 
                 # TODO: Do we want to ensure these are always different?
                 chosen_asset_id = asset_candidates.sample()["assetId"].iloc[0]
 
                 generated_object_id = (
-                    f"{child_object_type}|{room_id}|{total_small_objects_placed}"
+                    f"{object_type_to_spawn}|{room_id}|{total_small_objects_placed}"
                 )
 
                 # NOTE: spawn below the floor so it doesn't tip over any other objects.
@@ -687,21 +769,24 @@ def objaverse_add_small_objects(
                     position=Vector3(x=0, y=FLOOR_Y - 20, z=0),
                     renderImage=False,
                 )
-                assert (
-                    event
-                ), f"SpawnAsset failed for {chosen_asset_id} with {event.metadata['errorMessage']}!"
+                if not event:
+                    warnings.warn(f"{chosen_asset_id} failed to spawn (skipping), error message:\n{event.metadata['errorMessage']}")
+                    continue
+
+                # assert (
+                #     event
+                # ), f"SpawnAsset failed for {chosen_asset_id} with {event.metadata['errorMessage']}!"
                 controller.step(
                     action="SetObjectFilter", objectIds=[generated_object_id]
                 )
 
-                # obj_type = pt_db.ASSET_ID_DATABASE[chosen_asset_id]["objectType"]
                 openness = None
                 if (
-                    child_object_type in OPENNESS_RANDOMIZATIONS
+                    object_type_to_spawn in OPENNESS_RANDOMIZATIONS
                     and "CanOpen"
                     in pt_db.ASSET_ID_DATABASE[chosen_asset_id]["secondaryProperties"]
                 ):
-                    openness = sample_openness(child_object_type)
+                    openness = sample_openness(object_type_to_spawn)
                     controller.step(
                         action="OpenObject",
                         objectId=generated_object_id,
@@ -714,7 +799,7 @@ def objaverse_add_small_objects(
                     action="InitialRandomSpawn",
                     randomSeed=random.randint(0, 1_000_000_000),
                     objectIds=[generated_object_id],
-                    receptacleObjectIds=receptacle_object_ids,  # TODO: Should this just be the single receptacle id?
+                    receptacleObjectIds=receptacle_object_ids,
                     forceVisible=False,
                     allowFloor=False,
                     renderImage=False,
@@ -748,10 +833,10 @@ def objaverse_add_small_objects(
 
                 # NOTE: "___" is when there is a child SimObjPhysics of another
                 # SimObjPhysics object (e.g., drawers on dressers).
-                house_data_receptacle = group["receptacleId"]
-                if "___" in group["receptacleId"]:
-                    house_data_receptacle = group["receptacleId"][
-                        : group["receptacleId"].find("___")
+                house_data_receptacle = receptacle_info["receptacleId"]
+                if "___" in receptacle_info["receptacleId"]:
+                    house_data_receptacle = receptacle_info["receptacleId"][
+                        : receptacle_info["receptacleId"].find("___")
                     ]
                 if "children" not in objects_in_house[house_data_receptacle]:
                     objects_in_house[house_data_receptacle]["children"] = []
@@ -760,11 +845,11 @@ def objaverse_add_small_objects(
                     Object(
                         id=generated_object_id,
                         assetId=chosen_asset_id,
-                        objectType=group["childObjectType"],
+                        objectType=object_type_to_spawn,
                         rotation=obj["rotation"],
                         position=center_position,
                         kinematic=bool(
-                            pt_db.PLACEMENT_ANNOTATIONS.loc[group["childObjectType"]][
+                            pt_db.PLACEMENT_ANNOTATIONS.loc[object_type_to_spawn][
                                 "isKinematic"
                             ]
                         ),
@@ -773,10 +858,17 @@ def objaverse_add_small_objects(
                 )
 
                 total_small_objects_placed += 1
-                objects_types_placed_in_room.add(child_object_type)
-                if child_object_type not in object_type_to_count_in_room:
-                    object_type_to_count_in_room[child_object_type] = 0
-                object_type_to_count_in_room[child_object_type] += 1
+                objects_types_placed_in_room.add(object_type_to_spawn)
+                if object_type_to_spawn not in object_type_to_count_in_room:
+                    object_type_to_count_in_room[object_type_to_spawn] = 0
+                object_type_to_count_in_room[object_type_to_spawn] += 1
+
+                if (
+                    is_objaverse
+                    and is_head
+                    and object_type_to_count_in_room[object_type_to_spawn] > 1
+                ):
+                    have_placed_multi_objaverse_head_cat = True
 
                 total_tail_objaverse_objects_placed += is_objaverse and (not is_head)
                 total_head_objaverse_objects_placed += is_objaverse and is_head
