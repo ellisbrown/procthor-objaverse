@@ -71,7 +71,7 @@ MIN_RECTANGLE_SIDE_SIZE = 0.5
 """The minimum rectangle size per side, in meters, that can be chosen."""
 
 PROCESSED_ASSET_DIRECTORY = os.environ.get(
-    "OBJAVERSE_DIR",
+    "OBJAVERSE_ASSETS_DIR",
     os.path.join(os.path.dirname(__file__), "objaverse", "objaverse_assets"),
 )
 

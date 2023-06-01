@@ -3,6 +3,7 @@ import logging
 import multiprocessing as mp
 import os
 import queue
+import string
 import sys
 import time
 import traceback
@@ -72,10 +73,32 @@ def partition_sequence(seq: Sequence, parts: int) -> List:
     return [seq[ind0:ind1] for ind0, ind1 in zip(inds[:-1], inds[1:])]
 
 
+def parse_queue_id(id: str, expected_split: str):
+    assert set(id) <= set(
+        string.ascii_letters + string.digits + "_"
+    ), f"Invalid ID '{id}', id must only contain a-Z, 0-9, and _"
+
+    # Parse the ID into split, house
+    run_info = {k: v for part in id.split("__") for k, v in [part.split("_")]}
+
+    split = run_info["split"]
+    assert expected_split == split
+    house_index = int(run_info["house"])
+
+    return {
+        "id": id,
+        "split": split,
+        "house_index": int(house_index),
+    }
+
+
 def generate_house(
     worker_ind: int, split: Split, in_queue: mp.Queue, save_dir: str
 ) -> None:
     print(f"Worker {worker_ind}: start")
+    assert os.path.exists(
+        os.path.dirname(save_dir)
+    ), f"{os.path.dirname(save_dir)} must exist"
 
     device_kwargs = {}
     if sys.platform != "darwin":
@@ -94,6 +117,8 @@ def generate_house(
             height=100,
             **device_kwargs,
             **PROCTHOR_INITIALIZATION,
+            server_timeout=600,
+            server_start_timeout=600,
         )
 
     room_spec_sampler = UniformRoomSpecSampler(room_specs=ROOM_SPECS)
@@ -109,12 +134,21 @@ def generate_house(
     os.makedirs(save_dir, exist_ok=True)
 
     houses_generated = 0
-    controller = None
+    controller: Optional[Controller] = None
     min_fps: Optional[float] = None
     consecutive_failures = 0
     try:
         while True:
-            house_inds = in_queue.get(timeout=30)
+            ids = in_queue.get(timeout=30)
+
+            if isinstance(ids, str):
+                ids = [ids]
+            else:
+                assert isinstance(ids, list)
+
+            house_inds = [
+                parse_queue_id(id, expected_split=split)["house_index"] for id in ids
+            ]
 
             for house_ind in house_inds:
                 start_time = time.time()
@@ -135,7 +169,6 @@ def generate_house(
                     bench_fps = simple_benchmark_thor(controller)
 
                     min_fps = 0.25 * bench_fps  # Don't go below 25% of the iTHOR FPS
-                    assert min_fps > 10, f"min_fps [{min_fps}] <= 10"
 
                     print(f"Worker {worker_ind}: min_fps = {min_fps})")
                     controller.reset("Procedural")
@@ -187,7 +220,11 @@ def generate_house(
                         objects_in_json.append(object)
                         objects_in_json.extend(object.get("children", []))
 
-                    objaverse_objs_from_controller = [o for o in controller.last_event.metadata["objects"] if o['name'].startswith('Obja')]
+                    objaverse_objs_from_controller = [
+                        o
+                        for o in controller.last_event.metadata["objects"]
+                        if o["name"].startswith("Obja")
+                    ]
                     print(
                         f"Worker {worker_ind}: finished house {house_ind} (SUCCESS, {time_taken})"
                         f" {len(house.rooms)} rooms,"
@@ -203,6 +240,8 @@ def generate_house(
                         compressed=True,
                     )
     except queue.Empty:
+        pass
+    finally:
         try:
             controller.stop()
         except:
@@ -237,7 +276,7 @@ if __name__ == "__main__":
     in_queue = mp.Queue()
 
     for house_inds in partition_sequence(list(range(nhouses)), min(30000, nhouses)):
-        in_queue.put(house_inds)
+        in_queue.put([f"split_{args.split}__house_{i}" for i in house_inds])
 
     processes = []
     for worker_ind in range(nprocesses):

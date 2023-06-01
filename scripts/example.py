@@ -5,8 +5,9 @@ from procthor.generation import (
     RoomSpecSampler,
     RoomSpec,
 )
-from procthor.objaverse.house_generation.generate_objaverse_procthor_houses import \
-    _create_objaverse_generation_functions
+from procthor.objaverse.house_generation.generate_objaverse_procthor_houses import (
+    _create_objaverse_generation_functions,
+)
 from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from procthor.utils.types import LeafRoom, SamplingVars
 
