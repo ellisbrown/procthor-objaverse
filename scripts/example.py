@@ -38,6 +38,7 @@ def _create_objaverse_generation_functions():
         randomize_object_states=default_randomize_object_states,
     )
 
+
 if __name__ == "__main__":
     room_spec_sampler = RoomSpecSampler(
         [
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     )
     sampling_vars = SamplingVars(
         interior_boundary_scale=random.uniform(1.6, 2.2),
-        max_floor_objects = 10,
+        max_floor_objects=10,
     )
     house, _ = house_generator.sample()
     house.validate(house_generator.controller)

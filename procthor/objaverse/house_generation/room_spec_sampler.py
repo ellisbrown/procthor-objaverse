@@ -26,7 +26,7 @@ ROOM_SPEC_ID_BY_NUM_ROOMS = {
     6: ["2-bed-2-bath"],
     7: ["7-room-3-bed"],
     8: ["8-room-3-bed"],
-    10: ["12-room", "12-room-3-bed"],
+    # 10: ["12-room", "12-room-3-bed"],
 }
 
 

@@ -1276,7 +1276,7 @@ def default_add_floor_objects(
         random.shuffle(priority_asset_types)
 
         spawnable_asset_group_info = get_spawnable_asset_group_info(
-            split=room.split, controller=controller, pt_db=pt_db
+            splits=(room.split,), controller=controller, pt_db=pt_db
         )
         spawnable_asset_groups = spawnable_asset_group_info[
             spawnable_asset_group_info[f"in{room.room_type}s"] > 0

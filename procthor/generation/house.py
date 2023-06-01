@@ -3,6 +3,7 @@ import gzip
 import json
 import logging
 import random
+import time
 from collections import Counter
 from functools import total_ordering
 from typing import Any, Dict, List, Optional, Tuple
@@ -33,6 +34,28 @@ from .room_specs import RoomSpec
 def snake_to_camel_case(s: str):
     split = s.split("_")
     return split[0] + "".join(part.capitalize() for part in split[1:])
+
+
+def simple_benchmark_thor(controller: Controller, seed: int = 1) -> float:
+    rng = random.Random(seed)
+    actions = [
+        rng.choice(
+            [
+                "MoveAhead",
+                "MoveBack",
+                "RotateRight",
+                "RotateLeft",
+            ]
+        )
+        for _ in range(200)
+    ]
+    controller.step("ResetObjectFilter")
+    start = time.perf_counter()
+    for a in actions:
+        controller.step(a)
+    end = time.perf_counter()
+
+    return len(actions) / (end - start)
 
 
 @define
@@ -98,7 +121,9 @@ class House:
         """Generate a starting position for the default agent in the house."""
         return generate_starting_pose(self.rooms)
 
-    def validate(self, controller: Controller) -> Dict[str, str]:
+    def validate(
+        self, controller: Controller, min_fps: Optional[float] = None
+    ) -> Dict[str, str]:
         """Validate that the house is useable.
 
         Returns a dictionary of warnings or errors.
@@ -123,12 +148,15 @@ class House:
             logging.warning(warnings)
             self.data["metadata"]["warnings"] = warnings
             return warnings
+
         event = controller.step(action="GetReachablePositions", renderImage=False)
+
         if not event:
             warnings["GetReachablePositions"] = "Failed to get reachable positions"
             logging.warning(warnings)
             self.data["metadata"]["warnings"] = warnings
             return warnings
+
         rps = event.metadata["actionReturn"]
 
         random.shuffle(rps)
@@ -154,6 +182,13 @@ class House:
             warnings[
                 "RoomsNotNavigable"
             ] = f"Rooms {unnavigable_rooms} / {len(points_per_room)} are not navigable."
+
+        if len(warnings) == 0 and min_fps is not None and min_fps > 0:
+            fps = simple_benchmark_thor(controller=controller)
+            if fps < min_fps:
+                warnings[
+                    "BelowMinFPS"
+                ] = f"FPS {fps} is below minimum of {min_fps}."
 
         if warnings:
             logging.warning(warnings)

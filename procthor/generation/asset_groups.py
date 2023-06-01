@@ -1,7 +1,7 @@
 import copy
 import random
 from itertools import combinations
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Sequence
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ class AssetGroupGenerator:
     name: str
     """The name of the asset group."""
 
-    split: Split
+    splits: Sequence[Split]
     """The split for the asset group."""
 
     data: Dict[str, Any]
@@ -49,18 +49,19 @@ class AssetGroupGenerator:
             """Tansforms asset_metadata[assetIds] from [asset_type]: [...assetIds]
             to [...(asset_type, asset_id)] and filter assets by split.
             """
+            splits = {
+                None,
+                *self.splits,
+            }
             for asset_metadata in self.data["assetMetadata"].values():
                 out = []
                 for asset_type, asset_ids in asset_metadata["assetIds"].items():
                     for asset_id in asset_ids:
-                        if self.pt_db.ASSET_ID_DATABASE[asset_id]["split"] in {
-                            None,
-                            self.split,
-                        }:
+                        if self.pt_db.ASSET_ID_DATABASE[asset_id]["split"] in splits:
                             out.append((asset_type, asset_id))
                 if not out:
                     raise Exception(
-                        f"No valid asset groups for {self.name} with {self.split} split!"
+                        f"No valid asset groups for {self.name} with in {splits} splits!"
                     )
                 asset_metadata["assetIds"] = out
 

@@ -2,7 +2,7 @@ import json
 import os
 from collections import defaultdict
 from functools import lru_cache
-from typing import Any, Dict, List, Union, Tuple, Optional
+from typing import Any, Dict, List, Union, Tuple, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,7 @@ class ProcTHORDatabase:
 
 @lru_cache(maxsize=None)
 def get_spawnable_asset_group_info(
-    split: Split, controller: Controller, pt_db: ProcTHORDatabase
+    splits: Tuple[Split, ...], controller: Controller, pt_db: ProcTHORDatabase
 ) -> pd.DataFrame:
     from procthor.generation.asset_groups import AssetGroupGenerator
 
@@ -46,7 +46,7 @@ def get_spawnable_asset_group_info(
     for asset_group_name, asset_group_data in asset_groups.items():
         asset_group_generator = AssetGroupGenerator(
             name=asset_group_name,
-            split=split,
+            splits=splits,
             data=asset_group_data,
             controller=controller,
             pt_db=pt_db,

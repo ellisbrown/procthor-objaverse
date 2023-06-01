@@ -834,6 +834,9 @@ def add_paintings(
 
             # NOTE: subtract painting from valid locations in room
             room_lines_df = room_lines_df.drop(room_line_i)
+            rooms_lines_df_map[room_id] = rooms_lines_df_map[room_id][
+                rooms_lines_df_map[room_id]["lineString"] != room_line["lineString"]
+            ]
 
             line_string = room_line["lineString"]
             line_string -= placement["poly"]
@@ -867,6 +870,9 @@ def add_paintings(
                 lines_to_append = pd.DataFrame(lines_to_append)
                 room_lines_df = pd.concat(
                     [room_lines_df, lines_to_append], ignore_index=True
+                )
+                rooms_lines_df_map[room_id] = pd.concat(
+                    [rooms_lines_df_map[room_id], lines_to_append], ignore_index=True
                 )
 
             # NOTE: Don't allow the same painting to be spawned in.

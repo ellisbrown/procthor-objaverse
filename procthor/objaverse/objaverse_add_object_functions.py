@@ -76,6 +76,19 @@ class ForkedPdb(pdb.Pdb):
             sys.stdin = _stdin
 
 
+def split_to_split_choices(split: str) -> List[str]:
+    split_choices = ["train"]
+    if split == "train":
+        pass
+    elif split == "val":
+        split_choices.append("val")
+    elif split == "test":
+        split_choices.append("test")
+    else:
+        raise NotImplementedError(f"Unknown split {split}")
+
+    return split_choices
+
 def objaverse_add_floor_objects(
     partial_house: PartialHouse,
     controller: Controller,
@@ -102,15 +115,7 @@ def objaverse_add_floor_objects(
         priority_asset_types = copy.deepcopy(pt_db.PRIORITY_ASSET_TYPES[room.room_type])
         random.shuffle(priority_asset_types)
 
-        split_choices = ["train"]
-        if room.split == "train":
-            pass
-        elif room.split == "val":
-            split_choices.append("val")
-        elif room.split == "test":
-            split_choices.extend(["val", "test"])
-        else:
-            raise NotImplementedError(f"Unknown split {room.split}")
+        split_choices = split_to_split_choices(split=room.split)
 
         random.shuffle(split_choices)
 
@@ -132,7 +137,7 @@ def objaverse_add_floor_objects(
         spawnable_assets_df_list = [sa_df for sa_df in spawnable_assets_df_list if sa_df.shape[0] > 0]
 
         spawnable_asset_group_info = get_spawnable_asset_group_info(
-            split=room.split, controller=controller, pt_db=pt_db
+            splits=tuple(split_choices), controller=controller, pt_db=pt_db
         )
         spawnable_asset_groups = spawnable_asset_group_info[
             spawnable_asset_group_info[f"in{room.room_type}s"] > 0
@@ -260,15 +265,7 @@ def add_objaverse_wall_objects(
     pt_db: ProcTHORDatabase,
 ) -> None:
     """Add paintings to the house."""
-    split_choices = ["train"]
-    if split == "train":
-        pass
-    elif split == "val":
-        split_choices.append("val")
-    elif split == "test":
-        split_choices.extend(["val", "test"])
-    else:
-        raise NotImplementedError(f"Unknown split {split}")
+    split_choices = split_to_split_choices(split=split)
 
     random.shuffle(split_choices)
 
@@ -354,6 +351,7 @@ def add_objaverse_wall_objects(
 
             # NOTE: subtract painting from valid locations in room
             room_lines_df = room_lines_df.drop(room_line_i)
+            rooms_lines_df_map[room_id] = rooms_lines_df_map[room_id][rooms_lines_df_map[room_id]["lineString"] != room_line["lineString"]]
 
             line_string = room_line["lineString"]
             line_string -= placement["poly"]
@@ -387,6 +385,9 @@ def add_objaverse_wall_objects(
                 lines_to_append = pd.DataFrame(lines_to_append)
                 room_lines_df = pd.concat(
                     [room_lines_df, lines_to_append], ignore_index=True
+                )
+                rooms_lines_df_map[room_id] = pd.concat(
+                    [rooms_lines_df_map[room_id], lines_to_append], ignore_index=True
                 )
 
             # NOTE: Don't allow the same painting to be spawned in.
@@ -705,16 +706,12 @@ def objaverse_add_small_objects(
                     if len(object_type_to_receptacle_infos[object_type_to_spawn]) == 0:
                         del object_type_to_receptacle_infos[object_type_to_spawn]
 
-
-                split_sets = [["train", None]]
-                if split == "train":
-                    pass
-                elif split == "val":
-                    split_sets.append(["val"])
-                elif split == "test":
-                    split_sets.extend([["val"], ["test"]])
-                else:
-                    raise NotImplementedError(f"Unknown split {split}")
+                split_sets = []
+                for split_choice in split_to_split_choices(split=split):
+                    if split == "train":
+                        split_sets.append(["train", None])
+                    else:
+                        split_sets.append([split_choice])
 
                 random.shuffle(split_sets)
 

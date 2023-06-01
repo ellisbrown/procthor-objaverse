@@ -304,7 +304,9 @@ def refine_annotations_and_update_thor_metadata(
         )
 
     print(
-        f"New annotations contain {len(refined_annotations)} objects. Metadata missing for for {len(missing_metadata)} objects."
+        f"New annotations contain {len(refined_annotations)} objects."
+        f" Metadata missing for for {len(missing_metadata)} objects.",
+        flush=True,
     )
     return refined_annotations
 
@@ -371,29 +373,69 @@ def create_splits(
         for obj in objects[:ntrain]:
             obj["split"] = "train"
 
-        for obj in objects[ntrain:ntrain+nvalid]:
+        for obj in objects[ntrain : ntrain + nvalid]:
             obj["split"] = "val"
 
-        for obj in objects[ntrain+nvalid:]:
+        for obj in objects[ntrain + nvalid :]:
             obj["split"] = "test"
 
     return annotations
 
 
-def main():
-    # with open(
-    #     os.path.join(OBJAVERSE_DIR, "annotations/objaverse_thor_v0p95_success.json"),
-    #     "r",
-    # ) as f:
-    #     annotations = json.load(f)
+def print_annotations_summary(annotations: Dict[str, Dict[str, Any]]):
+    df = pd.DataFrame(annotations.values())
+    df["is_train"] = df["split"] == "train"
+    df["is_val"] = df["split"] == "val"
+    df["is_test"] = df["split"] == "test"
 
+    print(
+        f"Annotations contain {len(df)} objects, {len(df[df['is_train']])} train, {len(df[df['is_val']])} val, {len(df[df['is_test']])} test"
+    )
+    summed = df.groupby("category")
+    print(
+        f"{(summed['is_train'].sum() > 0).sum()} train categories ({df['is_train'].sum()} objects)"
+    )
+    print(
+        f"{(summed['is_val'].sum() > 0).sum()} val categories ({df['is_val'].sum()} objects)"
+    )
+    print(
+        f"{(summed['is_test'].sum() > 0).sum()} test categories ({df['is_test'].sum()} objects)"
+    )
+
+
+def remove_categories_that_are_not_in_train(annotations: Dict[str, Dict[str, Any]]):
+    train_categories = {
+        info["category"] for info in annotations.values() if info["split"] == "train"
+    }
+
+    new_annotations = {}
+    for oid, info in annotations.items():
+        if info["category"] in train_categories:
+            new_annotations[oid] = info
+
+    return new_annotations
+
+
+def main(should_create_splits: bool = False):
     annotations = prior.load_dataset(
-        "objaverse-plus", revision="e6b9358f8fe684d926a9a36c631341fdfd96e112"
+        "objaverse-plus", revision="4f23a101f2a21debd784210ce568cc1ada9cd913"
     )["train"].data
 
     new_db = copy.deepcopy(DEFAULT_PROCTHOR_DATABASE)
 
-    annotations = create_splits(annotations)
+    if should_create_splits:
+        assert all("split" not in info for info in annotations.values())
+        annotations = create_splits(annotations)
+        compress_json.dump(
+            annotations, os.path.join(OBJAVERSE_DATASETS_DIR, "thor_subset.json.gz")
+        )
+    else:
+        assert all(
+            info["split"] in ["train", "val", "test"] for info in annotations.values()
+        )
+
+    print("\nBefore filtering and refining:")
+    print_annotations_summary(annotations)
 
     annotations = refine_annotations_and_update_thor_metadata(
         pt_db=new_db,
@@ -404,24 +446,33 @@ def main():
 
     annotations = filter_annotations(annotations)
 
+    print("\nAfter filtering and refining:")
+    print_annotations_summary(annotations)
+
+    annotations = remove_categories_that_are_not_in_train(annotations)
+
+    print("\nAfter removing categories not in train:")
+    print_annotations_summary(annotations)
+
     compress_json.dump(
         annotations, os.path.join(OBJAVERSE_DATASETS_DIR, "refined_annotations.json")
     )
 
     # import matplotlib.pyplot as plt
     # import numpy as np
-    import pandas as pd
 
-    df = pd.DataFrame(annotations.values())
-    df["is_train"] = df["split"] == "train"
-    df["is_val"] = df["split"] == "val"
-    df["is_test"] = df["split"] == "test"
-
-    print(f"Contains {len(df)} objects, {len(df[df['is_train']])} train, {len(df[df['is_val']])} val, {len(df[df['is_test']])} test")
-    summed = df.groupby("category")
-    print(f"{(summed['is_train'].sum() > 0).sum()} train categories")
-    print(f"{(summed['is_val'].sum() > 0).sum()} val categories")
-    print(f"{(summed['is_test'].sum() > 0).sum()} test categories")
+    # df = pd.DataFrame(annotations.values())
+    # df["is_train"] = df["split"] == "train"
+    # df["is_val"] = df["split"] == "val"
+    # df["is_test"] = df["split"] == "test"
+    #
+    # print(
+    #     f"Contains {len(df)} objects, {len(df[df['is_train']])} train, {len(df[df['is_val']])} val, {len(df[df['is_test']])} test"
+    # )
+    # summed = df.groupby("category")
+    # print(f"{(summed['is_train'].sum() > 0).sum()} train categories")
+    # print(f"{(summed['is_val'].sum() > 0).sum()} val categories")
+    # print(f"{(summed['is_test'].sum() > 0).sum()} test categories")
 
     # df["volume"] = [
     #     np.product(list(a["boundingBox"].values())) for a in annotations.values()
@@ -453,4 +504,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(should_create_splits=False)

@@ -9,7 +9,7 @@ from collections import Counter
 
 if __name__ == "__main__":
     house = compress_json.load(
-        os.path.join(ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR, "datasets/procthor-objaverse/train/15.json.gz")
+        os.path.join(ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR, "datasets/procthor-objaverse/train/0.json.gz")
     )
 
     c = Controller(
