@@ -89,6 +89,7 @@ def split_to_split_choices(split: str) -> List[str]:
 
     return split_choices
 
+
 def objaverse_add_floor_objects(
     partial_house: PartialHouse,
     controller: Controller,
@@ -121,9 +122,7 @@ def objaverse_add_floor_objects(
 
         spawnable_assets_df_list = []
         for split in split_choices:
-            _, spawnable_assets = pt_db.FLOOR_ASSET_DICT[
-                (room.room_type, split)
-            ]
+            _, spawnable_assets = pt_db.FLOOR_ASSET_DICT[(room.room_type, split)]
 
             if EXCLUDE_NON_OBJAVERSE_ASSETS:
                 spawnable_assets = spawnable_assets[
@@ -134,7 +133,9 @@ def objaverse_add_floor_objects(
                 ]
             spawnable_assets_df_list.append(spawnable_assets)
         assert any(sa_df.shape[0] > 0 for sa_df in spawnable_assets_df_list)
-        spawnable_assets_df_list = [sa_df for sa_df in spawnable_assets_df_list if sa_df.shape[0] > 0]
+        spawnable_assets_df_list = [
+            sa_df for sa_df in spawnable_assets_df_list if sa_df.shape[0] > 0
+        ]
 
         spawnable_asset_group_info = get_spawnable_asset_group_info(
             splits=tuple(split_choices), controller=controller, pt_db=pt_db
@@ -214,7 +215,8 @@ def objaverse_add_floor_objects(
 
                     # NOTE: Remove all standalone assets that have the type
                     spawnable_assets_df_list = [
-                        sd_df[sd_df["assetType"] != asset_type] for sd_df in spawnable_assets_df_list
+                        sd_df[sd_df["assetType"] != asset_type]
+                        for sd_df in spawnable_assets_df_list
                     ]
 
         # NOTE: add the formatted assets
@@ -351,7 +353,9 @@ def add_objaverse_wall_objects(
 
             # NOTE: subtract painting from valid locations in room
             room_lines_df = room_lines_df.drop(room_line_i)
-            rooms_lines_df_map[room_id] = rooms_lines_df_map[room_id][rooms_lines_df_map[room_id]["lineString"] != room_line["lineString"]]
+            rooms_lines_df_map[room_id] = rooms_lines_df_map[room_id][
+                rooms_lines_df_map[room_id]["lineString"] != room_line["lineString"]
+            ]
 
             line_string = room_line["lineString"]
             line_string -= placement["poly"]
@@ -729,7 +733,7 @@ def objaverse_add_small_objects(
                         # to only place smaller house plants on receptacles.
                         asset_candidates = asset_candidates[
                             asset_candidates["ySize"] < HOUSE_PLANT_MAX_HEIGHT
-                            ]
+                        ]
 
                     if asset_candidates.shape[0] > 0:
                         break
@@ -767,7 +771,9 @@ def objaverse_add_small_objects(
                     renderImage=False,
                 )
                 if not event:
-                    warnings.warn(f"{chosen_asset_id} failed to spawn (skipping), error message:\n{event.metadata['errorMessage']}")
+                    warnings.warn(
+                        f"{chosen_asset_id} failed to spawn (skipping), error message:\n{event.metadata['errorMessage']}"
+                    )
                     continue
 
                 # assert (

@@ -101,7 +101,7 @@ def scale_boundary_groups(
     out = dict()
     for key, lines in boundary_groups.items():
         scaled_lines = set()
-        for ((x0, z0), (x1, z1)) in lines:
+        for (x0, z0), (x1, z1) in lines:
             scaled_lines.add(
                 (
                     (round(x0 * scale, precision), round(z0 * scale, precision)),
@@ -135,7 +135,7 @@ def get_floor_polygons(xz_poly_map: dict) -> Dict[str, Polygon]:
     floor_polygons = dict()
     for room_id, xz_poly in xz_poly_map.items():
         floor_polygon = []
-        for ((x0, z0), (x1, z1)) in xz_poly:
+        for (x0, z0), (x1, z1) in xz_poly:
             floor_polygon.append((x0, z0))
         floor_polygon.append((x1, z1))
         floor_polygons[f"room|{room_id}"] = Polygon(floor_polygon)
@@ -230,7 +230,7 @@ def create_empty_partial_house(
 ) -> PartialHouse:
     walls = []
     for room_id, xz_poly in xz_poly_map.items():
-        for ((x0, z0), (x1, z1)) in xz_poly:
+        for (x0, z0), (x1, z1) in xz_poly:
             wall_id = f"wall|{room_id}|{min(x0, x1):.2f}|{min(z0, z1):.2f}|{max(x0, x1):.2f}|{max(z0, z1):.2f}"
             wall = Wall(
                 id=wall_id,

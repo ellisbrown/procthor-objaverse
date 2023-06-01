@@ -9,8 +9,8 @@ from procthor.databases import (
 )
 import pandas as pd
 
-MAX_HEAD_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 4 #20
-MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 1 #20
+MAX_HEAD_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 4  # 20
+MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 1  # 20
 MIN_OBJAVERSE_INSTANCES_FOR_HEAD_CATEGORY = 3
 EXCLUDE_NON_OBJAVERSE_ASSETS = False
 
@@ -53,12 +53,14 @@ def _objaverse_get_floor_assets(
 
     return floor_types, assets
 
+
 def _get_objaverse_floor_assets_from_key(key: Tuple[str, str]):
     return _objaverse_get_floor_assets(*key, pt_db=DEFAULT_OBJAVERSE_PROCTHOR_DATABASE)
 
 
-
-_DDL = DatabaseLoader(databases_dir=os.path.join(os.path.dirname(__file__), "objaverse_databases"))
+_DDL = DatabaseLoader(
+    databases_dir=os.path.join(os.path.dirname(__file__), "objaverse_databases")
+)
 
 DEFAULT_OBJAVERSE_PROCTHOR_DATABASE = ProcTHORDatabase(
     SOLID_WALL_COLORS=_DDL.get_solid_wall_colors(),

@@ -332,7 +332,7 @@ def filter_annotations(
                 reject = True
 
         reject = reject or (info["object_type"] == "ObjaToilet")
-        reject = reject or (info["filesize"] > 1.5 * (2 ** 20))  # Reject files > 1.5mb
+        reject = reject or (info["filesize"] > 1.5 * (2**20))  # Reject files > 1.5mb
 
         reject = reject or (
             info["ref_category"] == "Painting"
@@ -351,7 +351,7 @@ def filter_annotations(
 def create_hash_seed(s: str) -> int:
     h = hashlib.md5()
     h.update(s.encode())
-    return int(h.hexdigest(), 16) % 2 ** 31
+    return int(h.hexdigest(), 16) % 2**31
 
 
 def create_splits(

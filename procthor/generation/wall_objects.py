@@ -159,7 +159,7 @@ def sample_asset_y_position(
     return center_y_height + asset_height / 2, center_y_height - asset_height / 2
 
 
-#%% Windows
+# %% Windows
 
 ROOM_TYPES_WITH_WINDOWS = {"Bedroom", "Kitchen", "LivingRoom"}
 """The room types that windows can exist in."""
@@ -466,7 +466,7 @@ def add_windows(
             ]
 
 
-#%% Paintings
+# %% Paintings
 PAINTINGS_PER_ROOM = {
     "population": [0, 1, 2, 3, 4],
     "weights": [0.05, 0.1, 0.5, 0.25, 0.1],
@@ -881,7 +881,7 @@ def add_paintings(
                 min_painting_size = paintings_df["xSize"].min()
 
 
-#%% add Televisions to the wall
+# %% add Televisions to the wall
 VALID_WALL_TELEVISIONS = {
     "Television_14",
     "Television_16",
@@ -1046,7 +1046,7 @@ def add_televisions(
     return tvs_per_room, rooms_lines_df_map, wall_object_heights_per_room
 
 
-#%% Add wall objects
+# %% Add wall objects
 def default_add_wall_objects(
     partial_house: PartialHouse,
     controller: Controller,

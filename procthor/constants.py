@@ -2,7 +2,9 @@ import os
 
 from ai2thor.hooks.procedural_asset_hook import ProceduralAssetHookRunner
 
-ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR = os.path.dirname(
+    os.path.abspath(os.path.dirname(__file__))
+)
 
 USE_ITHOR_SPLITS = True
 """Determines if the iTHOR object splits should be used spawning objects."""
@@ -69,7 +71,8 @@ MIN_RECTANGLE_SIDE_SIZE = 0.5
 """The minimum rectangle size per side, in meters, that can be chosen."""
 
 PROCESSED_ASSET_DIRECTORY = os.environ.get(
-    "OBJAVERSE_DIR", os.path.join(os.path.dirname(__file__), "objaverse", "objaverse_assets")
+    "OBJAVERSE_DIR",
+    os.path.join(os.path.dirname(__file__), "objaverse", "objaverse_assets"),
 )
 
 PROCTHOR_INITIALIZATION = dict(

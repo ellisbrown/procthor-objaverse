@@ -186,9 +186,7 @@ class House:
         if len(warnings) == 0 and min_fps is not None and min_fps > 0:
             fps = simple_benchmark_thor(controller=controller)
             if fps < min_fps:
-                warnings[
-                    "BelowMinFPS"
-                ] = f"FPS {fps} is below minimum of {min_fps}."
+                warnings["BelowMinFPS"] = f"FPS {fps} is below minimum of {min_fps}."
 
         if warnings:
             logging.warning(warnings)
@@ -285,7 +283,7 @@ class PartialHouse:
     ) -> "PartialHouse":
         walls = []
         for room_id, xz_poly in house_structure.xz_poly_map.items():
-            for ((x0, z0), (x1, z1)) in xz_poly:
+            for (x0, z0), (x1, z1) in xz_poly:
                 wall_id = f"wall|{room_id}|{min(x0, x1):.2f}|{min(z0, z1):.2f}|{max(x0, x1):.2f}|{max(z0, z1):.2f}"
                 wall = Wall(
                     id=wall_id,

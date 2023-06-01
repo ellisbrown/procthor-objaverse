@@ -32,7 +32,6 @@ ROOM_SPEC_ID_BY_NUM_ROOMS = {
 
 @define
 class LayoutSizeRoomSpecSampler(RoomSpecSampler):
-
     room_spec_by_num_rooms: Dict[int, List[RoomSpec]] = field(init=False)
     weights_all: List[int] = []
 
@@ -64,7 +63,6 @@ class LayoutSizeRoomSpecSampler(RoomSpecSampler):
 
 @define
 class UniformRoomSpecSampler(RoomSpecSampler):
-
     uniform_rooms_specs: List[RoomSpec] = []
     room_spec_by_num_rooms: Dict[int, List[RoomSpec]] = field(init=False)
     weights_all: List[int] = []

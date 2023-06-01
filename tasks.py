@@ -4,7 +4,8 @@ ASSET_DATABASE_PATH = "procthor/databases/asset-database.json"
 MATERIAL_DATABASE_PATH = "procthor/databases/material-database.json"
 ASSET_IMAGE_SIZE = 450
 
-#%% Utils
+
+# %% Utils
 @task
 def set_version(c, version):
     """Writes the version upon a release."""

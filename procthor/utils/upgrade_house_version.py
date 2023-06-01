@@ -210,7 +210,7 @@ class HouseUpgradeManager:
                 (["objects", "color"], ["objects", "material", "color"], True),
             ]
 
-            for (source_keys, target_keys, delete_source_key) in remapping:
+            for source_keys, target_keys, delete_source_key in remapping:
                 remap_keys(house, source_keys, out, out, target_keys, delete_source_key)
 
             hole_assets = DEFAULT_PROCTHOR_DATABASE.ASSET_ID_DATABASE

@@ -288,7 +288,7 @@ def select_openings(
 
             assert nx.is_connected(g)
 
-            for (room_group_0_ind, room_group_1_ind, _) in list(
+            for room_group_0_ind, room_group_1_ind, _ in list(
                 nx.minimum_spanning_edges(g)
             ):
                 group_ind_pair = (room_group_0_ind, room_group_1_ind)
@@ -614,7 +614,6 @@ def fix_door_intersections(doors: List[ProceduralDoor]):
 
             collisions = []
             for d0, d1 in itertools.combinations(doors, 2):
-
                 if d0.polygon(
                     entrance_padding=(
                         entrance_padding
