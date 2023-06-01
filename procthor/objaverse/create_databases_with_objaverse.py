@@ -63,7 +63,8 @@ def create_asset_database(
                 "maxImagePixelLength": None,  # TODO: Don't think we need this
                 "objectType": object_type,
                 "scenes": [],  # TODO: Don't think we need this
-                "secondaryProperties": [],
+                "primaryProperty": asset["primaryProperty"],
+                "secondaryProperties": asset["secondaryProperties"],
                 "split": asset["split"],
                 "states": {},  # TODO: This seems to only apply to objects that open
                 "isObjaverse": True,
@@ -196,48 +197,6 @@ def objaverse_cat_to_thor_cat(objaverse_cat: str):
     return "Obja" + objaverse_cat.title().replace(" ", "")
 
 
-# def update_thor_metadata_with_primary_and_secondary_properties(
-#     pt_db: ProcTHORDatabase,
-#     annotations: Dict[str, Dict[str, Any]],
-#     path_to_objects: str,
-# ):
-#     missing_thor_metadata = []
-#     allowed_secondary_properties = [
-#         "Receptacle",
-#         "CanPickup",
-#         "Moveable",
-#     ]  # Don't allow things like "CanOpen"
-#     for oid in tqdm.tqdm(annotations, desc="Updating thor md files"):
-#         thor_metadata_path = os.path.join(path_to_objects, oid, f"thor_metadata.json")
-#         if not os.path.exists(thor_metadata_path):
-#             missing_thor_metadata.append(oid)
-#             continue
-#
-#         with open(thor_metadata_path, "r") as f:
-#             md = json.load(f)
-#
-#         if md["assetMetadata"]["primaryProperty"] in ["Undefined", "Static"]:
-#             ref_ot = annotations[oid]["ref_category"]
-#             ref_obj = pt_db.ASSET_DATABASE[ref_ot][0]
-#
-#             md["assetMetadata"]["primaryProperty"] = ref_obj.get(
-#                 "primaryProperty", "Moveable"
-#             )
-#             md["assetMetadata"]["secondaryProperties"] = [
-#                 sp
-#                 for sp in ref_obj.get("secondaryProperties", [])
-#                 if sp in allowed_secondary_properties
-#             ]
-#
-#             # if md["assetMetadata"]["primaryProperty"] == "Static":
-#             #     print(
-#             #         f"For oid {oid}, has cat {annotations[oid]['category']} and ref_cat {ref_ot} which is static"
-#             #     )
-#
-#             with open(thor_metadata_path, "w") as f:
-#                 json.dump(md, f, indent=2)
-
-
 def refine_annotations_and_update_thor_metadata(
     pt_db: ProcTHORDatabase,
     annotations: Dict[str, Dict[str, Any]],
@@ -295,6 +254,10 @@ def refine_annotations_and_update_thor_metadata(
             with open(md_path, "w") as f:
                 json.dump(md, f, indent=2)
 
+        object_annotation["primaryProperty"] = md["assetMetadata"]["primaryProperty"]
+        object_annotation["secondaryProperties"] = md["assetMetadata"][
+            "secondaryProperties"
+        ]
         object_annotation["pickupable"] = (
             md["assetMetadata"]["primaryProperty"] == "CanPickup"
         )

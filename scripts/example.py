@@ -2,42 +2,13 @@ import random
 
 from procthor.generation import (
     HouseGenerator,
-    GenerationFunctions,
-    default_sample_house_structure,
-    default_add_doors,
-    default_add_lights,
-    default_add_skybox,
-    default_add_exterior_walls,
-    default_add_rooms,
-    default_randomize_object_colors,
-    default_randomize_object_states,
     RoomSpecSampler,
     RoomSpec,
 )
-from procthor.objaverse.objaverse_add_object_functions import (
-    objaverse_add_floor_objects,
-    objaverse_add_wall_objects,
-    objaverse_add_small_objects,
-)
+from procthor.objaverse.house_generation.generate_objaverse_procthor_houses import \
+    _create_objaverse_generation_functions
 from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from procthor.utils.types import LeafRoom, SamplingVars
-
-
-def _create_objaverse_generation_functions():
-    return GenerationFunctions(
-        sample_house_structure=default_sample_house_structure,
-        add_doors=default_add_doors,
-        add_lights=default_add_lights,
-        add_skybox=default_add_skybox,
-        add_exterior_walls=default_add_exterior_walls,
-        add_rooms=default_add_rooms,
-        add_floor_objects=objaverse_add_floor_objects,
-        add_wall_objects=objaverse_add_wall_objects,
-        add_small_objects=objaverse_add_small_objects,
-        randomize_object_colors=default_randomize_object_colors,
-        randomize_object_states=default_randomize_object_states,
-    )
-
 
 if __name__ == "__main__":
     room_spec_sampler = RoomSpecSampler(

@@ -1,3 +1,4 @@
+import argparse
 import logging
 import multiprocessing as mp
 import os
@@ -14,18 +15,49 @@ from ai2thor.controller import Controller
 from ai2thor.platform import CloudRendering
 from procthor.constants import (
     PROCTHOR_INITIALIZATION,
-    ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR,
 )
-from procthor.generation import HouseGenerator
+from procthor.generation import (
+    HouseGenerator,
+    GenerationFunctions,
+    default_sample_house_structure,
+    default_add_doors,
+    default_add_lights,
+    default_add_skybox,
+    default_add_exterior_walls,
+    default_add_rooms,
+    default_randomize_object_colors,
+    default_randomize_object_states,
+)
 from procthor.generation.house import simple_benchmark_thor
 from procthor.objaverse.house_generation.room_spec_sampler import (
     ROOM_SPECS,
     UniformRoomSpecSampler,
 )
+from procthor.objaverse.objaverse_add_object_functions import (
+    objaverse_add_floor_objects,
+    objaverse_add_wall_objects,
+    objaverse_add_small_objects,
+)
 from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
-from scripts.example import _create_objaverse_generation_functions
+from procthor.utils.types import Split
 
 mp = mp.get_context("spawn" if sys.platform == "darwin" else "forkserver")
+
+
+def _create_objaverse_generation_functions():
+    return GenerationFunctions(
+        sample_house_structure=default_sample_house_structure,
+        add_doors=default_add_doors,
+        add_lights=default_add_lights,
+        add_skybox=default_add_skybox,
+        add_exterior_walls=default_add_exterior_walls,
+        add_rooms=default_add_rooms,
+        add_floor_objects=objaverse_add_floor_objects,
+        add_wall_objects=objaverse_add_wall_objects,
+        add_small_objects=objaverse_add_small_objects,
+        randomize_object_colors=default_randomize_object_colors,
+        randomize_object_states=default_randomize_object_states,
+    )
 
 
 def partition_sequence(seq: Sequence, parts: int) -> List:
@@ -40,8 +72,10 @@ def partition_sequence(seq: Sequence, parts: int) -> List:
     return [seq[ind0:ind1] for ind0, ind1 in zip(inds[:-1], inds[1:])]
 
 
-def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
-    print(f"Worker {worker_ind} start")
+def generate_house(
+    worker_ind: int, split: Split, in_queue: mp.Queue, save_dir: str
+) -> None:
+    print(f"Worker {worker_ind}: start")
 
     device_kwargs = {}
     if sys.platform != "darwin":
@@ -51,6 +85,9 @@ def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
         )
 
     def create_controller():
+        assert os.path.exists(
+            PROCTHOR_INITIALIZATION["action_hook_runner"].asset_directory
+        )
         return Controller(
             quality="Very Low",
             width=100,
@@ -69,26 +106,25 @@ def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
         generation_functions=_create_objaverse_generation_functions(),
     )
 
-    save_dir = os.path.join(
-        ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR, f"datasets/procthor-objaverse/{split}"
-    )
     os.makedirs(save_dir, exist_ok=True)
 
     houses_generated = 0
     controller = None
     min_fps: Optional[float] = None
+    consecutive_failures = 0
     try:
         while True:
             house_inds = in_queue.get(timeout=30)
 
             for house_ind in house_inds:
+                start_time = time.time()
                 save_path = os.path.join(save_dir, f"{house_ind}.json.gz")
 
                 if os.path.exists(save_path):
-                    print(f"Worker {worker_ind} skipping {house_ind}, already exists")
+                    print(f"Worker {worker_ind}: skipping {house_ind}, already exists")
                     continue
 
-                if houses_generated % 20 == 0:
+                if houses_generated % 10 == 0 or controller is None:
                     if controller != None:
                         controller.stop()  # TODO: Unload assets somehow instead of doing this
 
@@ -99,7 +135,7 @@ def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
                     bench_fps = simple_benchmark_thor(controller)
 
                     min_fps = 0.25 * bench_fps  # Don't go below 25% of the iTHOR FPS
-                    assert min_fps > 10, f"min_fps [{min_fps}] <= 20"
+                    assert min_fps > 10, f"min_fps [{min_fps}] <= 10"
 
                     print(f"Worker {worker_ind}: min_fps = {min_fps})")
                     controller.reset("Procedural")
@@ -110,65 +146,90 @@ def generate_house(worker_ind: int, split: str, in_queue: mp.Queue) -> None:
                 # NOTE: sometimes house_generator.sample() hangs
                 room_spec = None
                 while True:
+                    if consecutive_failures == 20:
+                        raise RuntimeError(
+                            f"Worker {worker_ind}: failed 20 times in a row, exiting"
+                        )
                     try:
                         house_generator.room_spec = room_spec
                         house, _ = house_generator.sample()
                         house.validate(house_generator.controller, min_fps=min_fps)
                         if house.data["metadata"]["warnings"]:
+                            consecutive_failures += 1
                             # NOTE: Keep the room spec the same to avoid sampling bias.
                             room_spec = house.room_spec
                             continue
+
+                        consecutive_failures = 0
                     except (AssertionError, KeyError):
                         house_generator.room_spec = room_spec
                         print(
-                            f"Worker {worker_ind} encountered an exception for {house_ind},"
+                            f"Worker {worker_ind}: encountered an exception for {house_ind},"
                             f" retrying... Exception:\n{traceback.format_exc()}"
                         )
+                        consecutive_failures += 1
                         continue
-                    except Exception as e:
+                    except Exception:
                         logging.error(traceback.format_exc())
                         house = None
+                        consecutive_failures += 1
 
                     break
 
-                print(
-                    f"Worker {worker_ind}: finished house {house_ind} (success: {house is not None})"
-                )
-
-                if house is not None:
-                    all_objects = []
-                    for object in house.data["objects"]:
-                        all_objects.append(object)
-                        all_objects.extend(object.get("children", []))
+                time_taken = f"took {time.time() - start_time:.1f}s"
+                if house is None:
                     print(
-                        f"Worker {worker_ind}: house {house_ind} has"
+                        f"Worker {worker_ind}: finished house {house_ind} (FAILURE, {time_taken}) skipping house {house_ind}"
+                    )
+                else:
+                    objects_in_json = []
+                    for object in house.data["objects"]:
+                        objects_in_json.append(object)
+                        objects_in_json.extend(object.get("children", []))
+
+                    objaverse_objs_from_controller = [o for o in controller.last_event.metadata["objects"] if o['name'].startswith('Obja')]
+                    print(
+                        f"Worker {worker_ind}: finished house {house_ind} (SUCCESS, {time_taken})"
                         f" {len(house.rooms)} rooms,"
-                        f" {len(all_objects)} objects,"
-                        f" {len([o for o in all_objects if o['objectType'].startswith('Obja')])} objaverse objects"
+                        f" {len(objects_in_json)} objects,"
+                        f" {len(objaverse_objs_from_controller)} objaverse objects"
+                        f" from {len(set(o['name'].split('|')[0] for o in objaverse_objs_from_controller))} unique classes"
+                        f" {len([o for o in objaverse_objs_from_controller if o['pickupable']])} pickupable"
+                        f" {len([o for o in objaverse_objs_from_controller if ((not o['pickupable']) and o['moveable'])])} moveable"
+                        f" {len([o for o in objaverse_objs_from_controller if not (o['pickupable'] or o['moveable'])])} neither"
                     )
                     house.to_json(
                         save_path,
                         compressed=True,
                     )
-                else:
-                    print(f"Worker {worker_ind}: skipping house {house_ind}")
     except queue.Empty:
         try:
             controller.stop()
         except:
             pass
-        print(f"Worker {worker_ind} finished")
+        print(f"Worker {worker_ind}: finished")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generating houses")
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        help="""The directory to save the dataset to.""",
+        required=True,
+    )
+    parser.add_argument(
+        "--split", type=str, help="""The train, val, or test split.""", required=True
+    )
+    args = parser.parse_args()
+
     on_server = sys.platform != "darwin"
 
-    nprocesses = 60 if on_server else 1
-    split = "test"
+    nprocesses = torch.cuda.device_count() * 15 if on_server else 1
 
-    if split == "train":
+    if args.split == "train":
         nhouses = 150_000
-    elif split in ["val", "test"]:
+    elif args.split in ["val", "test"]:
         nhouses = 15_000
     else:
         raise NotImplementedError
@@ -182,7 +243,12 @@ if __name__ == "__main__":
     for worker_ind in range(nprocesses):
         p = mp.Process(
             target=generate_house,
-            kwargs=dict(worker_ind=worker_ind, split=split, in_queue=in_queue),
+            kwargs=dict(
+                worker_ind=worker_ind,
+                split=args.split,
+                save_dir=args.save_dir,
+                in_queue=in_queue,
+            ),
         )
 
         p.start()

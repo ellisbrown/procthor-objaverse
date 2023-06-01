@@ -77,7 +77,7 @@ PROCESSED_ASSET_DIRECTORY = os.environ.get(
 
 PROCTHOR_INITIALIZATION = dict(
     # local_executable_path="/Users/lucaw/Dropbox/ai2/late2020-ai2thor/unity/builds/thor-OSXIntel64-local/thor-OSXIntel64-local.app/Contents/MacOS/AI2-THOR",
-    commit_id="06ab47fe81f5be97ed781ad6f7b777ab67e5c466",
+    commit_id="6ef85194f9dfd06686abc2de3958a356139bb257",
     # branch="cam_adjust",
     scene="Procedural",
     action_hook_runner=ProceduralAssetHookRunner(

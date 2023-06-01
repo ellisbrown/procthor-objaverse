@@ -21,6 +21,12 @@ export PYTHONPATH=$PYTHONPATH:$PWD
 python scripts/example.py
 ```
 
+## Objaverse
+
+```bash
+pip install --extra-index-url https://ai2thor-pypi.allenai.org ai2thor==0+539a0551a6d4944327d3f971e03825b0d5c6c564
+```
+
 ## Citation
 
 This code is used to generate houses for the [ProcTHOR](https://procthor.allenai.org/) paper:

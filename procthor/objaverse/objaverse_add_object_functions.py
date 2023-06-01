@@ -291,7 +291,7 @@ def add_objaverse_wall_objects(
             )
 
             # NOTE: No more space on the walls
-            if (not len(room_lines_df)) or (not len(joint_objaverse_df)):
+            if (not len(room_lines_df)) or (joint_objaverse_df.shape == 0):
                 break
 
             # NOTE: sample the line string
@@ -310,6 +310,10 @@ def add_objaverse_wall_objects(
                 obja_candidates = sub_df[sub_df["xSize"] < room_line["length"]]
                 if obja_candidates.shape[0] > 1:
                     break
+
+            # NOTE: No more space on the walls
+            if obja_candidates.shape[0] == 0:
+                break
 
             object_to_add = obja_candidates.sample()
 

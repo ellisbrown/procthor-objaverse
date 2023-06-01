@@ -139,3 +139,5 @@ dmypy.json
 **/temp*
 **/tmp*
 datasets/
+**/*_databases/
+**/*_assets
