@@ -1,13 +1,14 @@
 import os
 from typing import Tuple, Any
 
+import pandas as pd
 from procthor.databases import (
-    _get_floor_assets,
     DatabaseLoader,
     ProcTHORDatabase,
     keydefaultdict,
 )
-import pandas as pd
+
+from procthor.objaverse.create_databases_with_objaverse import OBJAVERSE_DIR
 
 MAX_HEAD_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 4  # 20
 MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 1  # 20
@@ -19,6 +20,10 @@ OBJAVERSE_WALL_OBJECTS_PER_ROOM = {
     "population": [0, 1, 2, 3, 4],
     "weights": [0.50, 0.50, 0.00, 0.00, 0.00],
 }
+
+OBJAVERSE_DATASETS_DIR = os.environ.get(
+    "OBJAVERSE_DATASETS_DIR", os.path.join(OBJAVERSE_DIR, "objaverse_databases")
+)
 
 
 def _objaverse_get_floor_assets(
@@ -58,9 +63,7 @@ def _get_objaverse_floor_assets_from_key(key: Tuple[str, str]):
     return _objaverse_get_floor_assets(*key, pt_db=DEFAULT_OBJAVERSE_PROCTHOR_DATABASE)
 
 
-_DDL = DatabaseLoader(
-    databases_dir=os.path.join(os.path.dirname(__file__), "objaverse_databases")
-)
+_DDL = DatabaseLoader(databases_dir=OBJAVERSE_DATASETS_DIR)
 
 DEFAULT_OBJAVERSE_PROCTHOR_DATABASE = ProcTHORDatabase(
     SOLID_WALL_COLORS=_DDL.get_solid_wall_colors(),

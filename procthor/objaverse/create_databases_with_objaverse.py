@@ -16,11 +16,9 @@ import tqdm
 from procthor.databases import DEFAULT_PROCTHOR_DATABASE, ProcTHORDatabase
 
 from procthor.constants import USE_ITHOR_SPLITS, PROCESSED_ASSET_DIRECTORY
+from procthor.objaverse.objaverse_constants import OBJAVERSE_DATASETS_DIR
 
 OBJAVERSE_DIR = os.path.abspath(os.path.dirname(Path(__file__)))
-OBJAVERSE_DATASETS_DIR = os.environ.get(
-    "OBJAVERSE_DATASETS_DIR", os.path.join(OBJAVERSE_DIR, "objaverse_databases")
-)
 
 DEFAULT_DECOR_PLACEMENT = {
     "instances": 1,
