@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Tuple, Any
 
 import pandas as pd
@@ -7,8 +8,6 @@ from procthor.databases import (
     ProcTHORDatabase,
     keydefaultdict,
 )
-
-from procthor.objaverse.create_databases_with_objaverse import OBJAVERSE_DIR
 
 MAX_HEAD_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 4  # 20
 MAX_TAIL_OBJAVERSE_OBJECT_TYPES_PER_ROOM = 1  # 20
@@ -21,6 +20,7 @@ OBJAVERSE_WALL_OBJECTS_PER_ROOM = {
     "weights": [0.50, 0.50, 0.00, 0.00, 0.00],
 }
 
+OBJAVERSE_DIR = os.path.abspath(os.path.dirname(Path(__file__)))
 OBJAVERSE_DATASETS_DIR = os.environ.get(
     "OBJAVERSE_DATASETS_DIR", os.path.join(OBJAVERSE_DIR, "objaverse_databases")
 )

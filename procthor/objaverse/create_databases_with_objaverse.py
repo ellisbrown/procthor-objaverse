@@ -6,7 +6,6 @@ import os
 import random
 import re
 from collections import Counter, defaultdict
-from pathlib import Path
 from typing import Dict, Any
 
 import compress_json
@@ -17,8 +16,6 @@ from procthor.databases import DEFAULT_PROCTHOR_DATABASE, ProcTHORDatabase
 
 from procthor.constants import USE_ITHOR_SPLITS, PROCESSED_ASSET_DIRECTORY
 from procthor.objaverse.objaverse_constants import OBJAVERSE_DATASETS_DIR
-
-OBJAVERSE_DIR = os.path.abspath(os.path.dirname(Path(__file__)))
 
 DEFAULT_DECOR_PLACEMENT = {
     "instances": 1,
