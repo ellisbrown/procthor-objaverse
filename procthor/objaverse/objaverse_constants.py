@@ -73,7 +73,6 @@ DEFAULT_OBJAVERSE_PROCTHOR_DATABASE = ProcTHORDatabase(
     ASSET_DATABASE=_DDL.get_asset_database(),
     ASSET_ID_DATABASE=_DDL.get_asset_id_database(),
     PLACEMENT_ANNOTATIONS=_DDL.get_placement_annotations(),
-    # AI2THOR_OBJECT_METADATA=_DDL._get_ai2thor_object_metadata(),
     ASSET_GROUPS=_DDL.get_asset_groups(),
     ASSETS_DF=_DDL.get_assets_df(),
     WALL_HOLES=_DDL.get_wall_holes(),
