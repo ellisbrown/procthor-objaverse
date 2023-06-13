@@ -8,7 +8,7 @@ from procthor.generation import (
 from procthor.objaverse.house_generation.generate_objaverse_procthor_houses import (
     _create_objaverse_generation_functions,
 )
-from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
+from procthor.objaverse.objaverse_databases import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from procthor.utils.types import LeafRoom, SamplingVars
 
 if __name__ == "__main__":

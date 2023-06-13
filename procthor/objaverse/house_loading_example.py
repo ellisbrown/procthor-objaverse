@@ -88,6 +88,7 @@ if __name__ == "__main__":
             asset_directory=PROCESSED_ASSET_DIRECTORY,
             asset_symlink=True,
             verbose=True,
+            asset_limit=200
         ),
     )
 

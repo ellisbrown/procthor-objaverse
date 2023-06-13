@@ -24,7 +24,7 @@ python scripts/example.py
 ## Objaverse
 
 ```bash
-pip install --extra-index-url https://ai2thor-pypi.allenai.org ai2thor==0+539a0551a6d4944327d3f971e03825b0d5c6c564
+pip install --extra-index-url https://ai2thor-pypi.allenai.org ai2thor==0+2219c5eb5220136cef664b5b9a6c84309fde469e
 ```
 
 ## Citation

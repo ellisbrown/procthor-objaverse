@@ -39,7 +39,7 @@ from procthor.objaverse.objaverse_add_object_functions import (
     objaverse_add_wall_objects,
     objaverse_add_small_objects,
 )
-from procthor.objaverse.objaverse_constants import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
+from procthor.objaverse.objaverse_databases import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from procthor.utils.types import Split
 
 mp = mp.get_context("spawn" if sys.platform == "darwin" else "forkserver")
