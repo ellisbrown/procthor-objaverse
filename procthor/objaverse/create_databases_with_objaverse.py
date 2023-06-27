@@ -10,12 +10,12 @@ from typing import Dict, Any
 
 import compress_json
 import pandas as pd
-import prior
 import tqdm
 from procthor.databases import DEFAULT_PROCTHOR_DATABASE, ProcTHORDatabase
 
 from procthor.constants import USE_ITHOR_SPLITS, PROCESSED_ASSET_DIRECTORY
 from procthor.objaverse.objaverse_constants import OBJAVERSE_DATASETS_DIR
+from procthor.utils.misc import get_objaverse_annotations
 
 DEFAULT_DECOR_PLACEMENT = {
     "instances": 1,
@@ -377,9 +377,7 @@ def remove_categories_that_are_not_in_train(annotations: Dict[str, Dict[str, Any
 
 
 def main(should_create_splits: bool = False):
-    annotations = prior.load_dataset(
-        "objaverse-plus", revision="4f23a101f2a21debd784210ce568cc1ada9cd913"
-    )["train"].data
+    annotations = get_objaverse_annotations()
 
     new_db = copy.deepcopy(DEFAULT_PROCTHOR_DATABASE)
 

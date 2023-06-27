@@ -588,9 +588,10 @@ def objaverse_add_small_objects(
             ]
 
             for object_type_to_spawn, data in objects_in_receptacle.items():
+                is_objaverse_asset = object_type_to_spawn.startswith("Obja")
                 if (
                     EXCLUDE_NON_OBJAVERSE_ASSETS
-                    and not object_type_to_spawn.startswith("Obja")
+                    and not is_objaverse_asset
                 ):
                     continue
 
@@ -608,7 +609,8 @@ def objaverse_add_small_objects(
                 if room_weight == 0:
                     continue
 
-                if random.random() <= (
+                # TODO: Will sample Objaverse objects with uniform probability, should we bias this?
+                if is_objaverse_asset or random.random() <= (
                     data["p"]
                     + PARENT_BIAS[receptacle["objectType"]]
                     + CHILD_BIAS[object_type_to_spawn]

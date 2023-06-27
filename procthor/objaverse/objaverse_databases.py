@@ -1,12 +1,12 @@
 from typing import Tuple, Any
 
 import pandas as pd
-
 from procthor.databases import (
     DatabaseLoader,
     ProcTHORDatabase,
     keydefaultdict,
 )
+
 from procthor.objaverse.objaverse_constants import OBJAVERSE_DATASETS_DIR
 
 

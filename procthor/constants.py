@@ -1,6 +1,7 @@
 import os
 
 from ai2thor.hooks.procedural_asset_hook import ProceduralAssetHookRunner
+from procthor.utils.misc import UpdateTHORMetadataWithObjaverseAnnotations
 
 ABS_PATH_OF_TOP_LEVEL_PROCTHOR_DIR = os.path.dirname(
     os.path.abspath(os.path.dirname(__file__))
@@ -77,12 +78,13 @@ PROCESSED_ASSET_DIRECTORY = os.environ.get(
 
 PROCTHOR_INITIALIZATION = dict(
     # local_executable_path="/Users/lucaw/Dropbox/ai2/late2020-ai2thor/unity/builds/thor-OSXIntel64-local/thor-OSXIntel64-local.app/Contents/MacOS/AI2-THOR",
-    commit_id="6ef85194f9dfd06686abc2de3958a356139bb257",
+    commit_id="bad2752c77f2a262255a383f298da081a9f4c8ab",
     # branch="cam_adjust",
     scene="Procedural",
     action_hook_runner=ProceduralAssetHookRunner(
         asset_directory=PROCESSED_ASSET_DIRECTORY, asset_symlink=True, verbose=True
     ),
+    metadata_hook=UpdateTHORMetadataWithObjaverseAnnotations(),
 )
 "Base AI2-THOR initialization parameters for ProcTHOR."
 
