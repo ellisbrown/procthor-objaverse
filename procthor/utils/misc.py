@@ -7,7 +7,7 @@ from ai2thor.controller import Controller
 
 def get_objaverse_annotations():
     return prior.load_dataset(
-        "objaverse-plus", revision="4f23a101f2a21debd784210ce568cc1ada9cd913"
+        "objaverse-plus", revision="bce68ddc9f9dfbf1566d61dc4f04ac60e2f2d125"
     )["train"].data
 
 
