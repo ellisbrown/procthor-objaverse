@@ -75,7 +75,7 @@ if __name__ == "__main__":
     dataset = prior.load_dataset(
         "procthor-objaverse-internal",
         revision="local",
-        path_to_splits="/Users/lucaw/tmp/houses_v0.0.1",  # TODO: Change this to your local path
+        path_to_splits="/Users/lucaw/tmp/houses_2023_07_28",  # TODO: Change this to your local path
         max_houses_per_split=100,
     )
 
