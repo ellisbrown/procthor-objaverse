@@ -589,10 +589,7 @@ def objaverse_add_small_objects(
 
             for object_type_to_spawn, data in objects_in_receptacle.items():
                 is_objaverse_asset = object_type_to_spawn.startswith("Obja")
-                if (
-                    EXCLUDE_NON_OBJAVERSE_ASSETS
-                    and not is_objaverse_asset
-                ):
+                if EXCLUDE_NON_OBJAVERSE_ASSETS and not is_objaverse_asset:
                     continue
 
                 type_placement_info = pt_db.PLACEMENT_ANNOTATIONS.loc[
