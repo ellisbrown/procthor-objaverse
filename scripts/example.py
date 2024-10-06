@@ -11,7 +11,11 @@ from procthor.objaverse.house_generation.generate_objaverse_procthor_houses impo
 from procthor.objaverse.objaverse_databases import DEFAULT_OBJAVERSE_PROCTHOR_DATABASE
 from procthor.utils.types import LeafRoom, SamplingVars
 
-if __name__ == "__main__":
+
+def example():
+    print("Running example.")
+
+    print("Creating RoomSpecSampler...")
     room_spec_sampler = RoomSpecSampler(
         [
             RoomSpec(
@@ -38,6 +42,7 @@ if __name__ == "__main__":
         ]
     )
 
+    print("Creating HouseGenerator...")
     house_generator = HouseGenerator(
         split="train",
         seed=41,
@@ -45,11 +50,23 @@ if __name__ == "__main__":
         pt_db=DEFAULT_OBJAVERSE_PROCTHOR_DATABASE,
         generation_functions=_create_objaverse_generation_functions(),
     )
+    print("Creating SamplingVars...")
     sampling_vars = SamplingVars(
         interior_boundary_scale=random.uniform(1.6, 2.2),
         max_floor_objects=10,
     )
+
+    print("Sampling house...")
     house, _ = house_generator.sample()
+
+    print("Validating house...")
     house.validate(house_generator.controller)
 
+    print("Saving house to 'temp.json'...")
     house.to_json("temp.json")
+
+    print("Example done.")
+
+
+if __name__ == "__main__":
+    example()
